@@ -46,7 +46,6 @@ export function colorRGB(table: ColorTable, name: string, shadeIndex: number): [
   if (e) {
     packed = e.shades[shadeIndex] ?? e.shades[1];
   } else {
-    // Unknown / modded block: deterministic colour, shaded by the same factors.
     const base = hashBase(name);
     const mul = FALLBACK_MUL[shadeIndex] ?? 220;
     const sh = (c: number) => Math.floor((c * mul) / 255) & 0xff;
@@ -56,7 +55,7 @@ export function colorRGB(table: ColorTable, name: string, shadeIndex: number): [
 }
 
 // ---------------------------------------------------------------------------
-// Top-block extraction
+// Shared helpers
 // ---------------------------------------------------------------------------
 
 const isAir = (n: string) => n === '' || n.endsWith(':air') || n.endsWith('_air');
@@ -65,8 +64,7 @@ const childTag = (section: TagData[], name: string): TagData | undefined =>
   section.find(x => x.name === name);
 
 // mc-anvil reads TAG_Byte as unsigned (getUint8), but section Y is signed and
-// is negative for sections below y=0 (e.g. Y=-4 is stored as 0xFC = 252).
-// Sign-extend so negative sections sort/position correctly.
+// negative below y=0 (e.g. Y=-4 is stored as 0xFC = 252). Sign-extend it.
 const signedByte = (v: number): number => (v > 127 ? v - 256 : v);
 
 const sectionY = (section: TagData[]): number => {
@@ -74,8 +72,6 @@ const sectionY = (section: TagData[]): number => {
   return y ? signedByte(Number(y.data)) : 0;
 };
 
-// Handles legacy (BlockStates/Palette on the section) and modern
-// (block_states.data / block_states.palette) chunk layouts.
 function sectionData(section: TagData[]): { bs?: BlockStates; pal?: Palette } {
   const directPal = childTag(section, 'Palette') ?? childTag(section, 'palette');
   if (directPal) {
@@ -100,26 +96,157 @@ const paletteEntryName = (entry: TagData[]): string => {
   return typeof n?.data === 'string' ? n.data : '';
 };
 
+// A block is drawn unless it's air or its map color is NONE (id 0). Unknown /
+// modded blocks are drawn with a hashed fallback colour.
+const drawable = (nm: string, table: ColorTable): boolean => {
+  if (isAir(nm)) return false;
+  const e = table.get(nm);
+  if (e && e.mapColorId === 0) return false;
+  return true;
+};
+
 export const EMPTY_HEIGHT = -2147483648;
 
 export type ChunkColumns = {
   ox: number;
   oz: number;
-  names: (string | null)[];   // [lz*16 + lx], topmost *drawable* block, or null
-  heights: Int32Array;        // [lz*16 + lx], world Y of that block, or EMPTY_HEIGHT
+  names: (string | null)[]; // [z*16 + x], topmost drawable block name, or null
+  heights: Int32Array; // [z*16 + x], world Y of that block, or EMPTY_HEIGHT
 };
 
-/**
- * For each 16x16 column, the topmost block that vanilla would draw on a map
- * (skips air and mapColorId-0 blocks like glass), plus that block's Y.
- */
-export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
+// ---------------------------------------------------------------------------
+// Single-section random-access reader
+//
+// Reads one block's palette index without unpacking the whole section. The bit
+// layout (big-endian longs, value j at bit j*bits from the LSB, top bits as
+// padding) was verified against mc-anvil's own decoder for every bit width.
+// ---------------------------------------------------------------------------
+
+type SectionReader = {
+  palNames: string[];
+  palDrawable: boolean[];
+  idxAt: (lx: number, ly: number, lz: number) => number; // palette index, or -1
+};
+
+function buildReader(section: TagData[], table: ColorTable): SectionReader | null {
+  const { bs, pal } = sectionData(section);
+  if (!pal) return null;
+  const entries = pal.data.data as TagData[][];
+  const palNames = entries.map(paletteEntryName);
+  const palDrawable = palNames.map(nm => drawable(nm, table));
+
+  if (entries.length <= 1) {
+    // Uniform section: one block fills it (or it's empty/air).
+    if (entries.length === 0 || !palDrawable[0]) return null;
+    return { palNames, palDrawable, idxAt: () => 0 };
+  }
+  if (!bs || !(bs.data instanceof ArrayBuffer) || bs.data.byteLength === 0) return null;
+
+  const paletteSize = entries.length;
+  const l = Math.floor(Math.log2((paletteSize - 1) || 1)) + 1;
+  const bits = Math.max(4, l);
+  const valuesPerLong = Math.floor(64 / bits);
+  const mask = (1n << BigInt(bits)) - 1n;
+  const n = Math.floor(bs.data.byteLength / 8);
+  const view = new DataView(bs.data);
+  const longs = new BigUint64Array(n);
+  for (let k = 0; k < n; k++) longs[k] = view.getBigUint64(k * 8, false); // big-endian
+
+  const idxAt = (lx: number, ly: number, lz: number): number => {
+    const i = ly * 256 + lz * 16 + lx;
+    const j = i % valuesPerLong;
+    const k = (i - j) / valuesPerLong;
+    if (k >= n) return -1;
+    return Number((longs[k] >> BigInt(j * bits)) & mask);
+  };
+  return { palNames, palDrawable, idxAt };
+}
+
+// ---------------------------------------------------------------------------
+// Fast path: WORLD_SURFACE heightmap + random-access block reads
+// ---------------------------------------------------------------------------
+
+const STEP_LIMIT = 32; // max blocks to step down past air/NONE before giving up
+
+function fastColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
   const coords = chunk.getCoordinates();
   if (!coords) return null;
   const [ox, oz] = coords;
 
-  // Do NOT use chunk.sortedSections(): it sorts by the unsigned Y byte, which
-  // mis-orders sub-zero sections. Order by the sign-corrected Y, top-down.
+  const sectionTag = chunk.sections();
+  if (!sectionTag) return null;
+
+  const byY = new Map<number, TagData[]>();
+  let minSecY = Infinity;
+  let maxSecY = -Infinity;
+  for (const s of sectionTag.data.data as TagData[][]) {
+    if (childTag(s, 'Y') === undefined) continue;
+    const y = sectionY(s);
+    byY.set(y, s);
+    if (y < minSecY) minSecY = y;
+    if (y > maxSecY) maxSecY = y;
+  }
+  if (!isFinite(minSecY)) return null;
+
+  const minY = minSecY * 16;
+  const maxY = maxSecY * 16 + 15;
+  // mc-anvil's worldHeights() hardcodes 9-bit entries, valid only up to 512 tall.
+  if (maxY - minY + 1 > 512) return null;
+
+  const hm = chunk.worldHeights('WORLD_SURFACE');
+  if (!hm) return null;
+
+  const readers = new Map<number, SectionReader | null>();
+  const getReader = (secY: number): SectionReader | null => {
+    if (readers.has(secY)) return readers.get(secY) ?? null;
+    const s = byY.get(secY);
+    const r = s ? buildReader(s, table) : null;
+    readers.set(secY, r);
+    return r;
+  };
+
+  const names: (string | null)[] = new Array(256).fill(null);
+  const heights = new Int32Array(256).fill(EMPTY_HEIGHT);
+
+  for (let z = 0; z < 16; z++) {
+    for (let x = 0; x < 16; x++) {
+      const v = hm[x][z];
+      if (v <= 0) continue; // empty / void column
+      let wy = minY + v - 1; // world Y of the topmost non-air block
+      if (wy > maxY) wy = maxY;
+      const c = z * 16 + x;
+
+      let ok = false;
+      for (let steps = 0; wy >= minY && steps <= STEP_LIMIT; wy--, steps++) {
+        const secY = Math.floor(wy / 16);
+        const rdr = getReader(secY);
+        if (!rdr) continue; // air / NONE-only / absent section
+        const ly = wy - secY * 16;
+        const idx = rdr.idxAt(x, ly, z);
+        if (idx < 0) continue;
+        if (rdr.palDrawable[idx]) {
+          names[c] = rdr.palNames[idx];
+          heights[c] = wy;
+          ok = true;
+          break;
+        }
+        // not drawable (air or NONE) -> keep stepping down
+      }
+      if (!ok) return null; // heightmap path unreliable here -> fall back to scan
+    }
+  }
+  return { ox, oz, names, heights };
+}
+
+// ---------------------------------------------------------------------------
+// Fallback path: top-down section scan (always correct, no heightmap needed)
+// ---------------------------------------------------------------------------
+
+function scanColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
+  const coords = chunk.getCoordinates();
+  if (!coords) return null;
+  const [ox, oz] = coords;
+
   const sectionTag = chunk.sections();
   if (!sectionTag) return null;
   const ordered = (sectionTag.data.data as TagData[][])
@@ -131,14 +258,6 @@ export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null
   const heights = new Int32Array(256).fill(EMPTY_HEIGHT);
   let resolved = 0;
 
-  // A block is drawn unless it's air or its map color is NONE (id 0).
-  const drawable = (nm: string): boolean => {
-    if (isAir(nm)) return false;
-    const e = table.get(nm);
-    if (e && e.mapColorId === 0) return false;
-    return true;
-  };
-
   for (let si = 0; si < ordered.length && resolved < 256; si++) {
     const { section, y } = ordered[si];
     const { bs, pal } = sectionData(section);
@@ -147,7 +266,7 @@ export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null
 
     if (entries.length <= 1) {
       const nm = entries.length === 1 ? paletteEntryName(entries[0]) : '';
-      if (drawable(nm)) {
+      if (drawable(nm, table)) {
         const absY = y * 16 + 15;
         for (let c = 0; c < 256; c++) {
           if (names[c] === null) {
@@ -162,23 +281,50 @@ export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null
     if (!bs || !(bs.data instanceof ArrayBuffer) || bs.data.byteLength === 0) continue;
 
     const sy = y * 16;
-    // Resolve name + drawability ONCE per palette entry (palettes are small),
-    // then read only raw palette indices for the 4096 positions instead of a
-    // name string per position. Scan top-down (i descending = y descending) so
-    // the first drawable hit per column is the surface, enabling an early break.
     const palNames = entries.map(paletteEntryName);
-    const palDrawable = palNames.map(nm => drawable(nm));
+    const palDrawable = palNames.map(nm => drawable(nm, table));
     const raw = new BlockDataParser(bs, pal).getRawBlocks();
     for (let i = 4095; i >= 0; i--) {
       const pi = raw[i];
       if (pi === undefined || !palDrawable[pi]) continue;
       const [lx, ly, lz] = chunkCoordinateFromIndex(i);
       const c = lz * 16 + lx;
-      if (names[c] !== null) continue; // already have a higher block
+      if (names[c] !== null) continue;
       names[c] = palNames[pi];
       heights[c] = sy + ly;
       if (++resolved === 256) break;
     }
   }
   return { ox, oz, names, heights };
+}
+
+// ---------------------------------------------------------------------------
+// Dispatcher: prefer the fast path, validate it once end-to-end, fall back
+// to the scan whenever the fast path is unavailable or disagrees.
+// ---------------------------------------------------------------------------
+
+let fastVerified: boolean | null = null; // null = not yet checked (per worker)
+
+function columnsEqual(a: ChunkColumns, b: ChunkColumns): boolean {
+  for (let i = 0; i < 256; i++) {
+    if (a.names[i] !== b.names[i] || a.heights[i] !== b.heights[i]) return false;
+  }
+  return true;
+}
+
+export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
+  if (fastVerified === false) return scanColumns(chunk, table);
+
+  const fast = fastColumns(chunk, table);
+  if (fast === null) return scanColumns(chunk, table); // no/short heightmap, etc.
+  if (fastVerified === true) return fast;
+
+  // First usable fast result: prove it matches the scan before trusting it.
+  const scan = scanColumns(chunk, table);
+  fastVerified = scan !== null && columnsEqual(fast, scan);
+  if (!fastVerified) {
+    console.error('[chunkmap] heightmap fast-path disagreed with block scan; using scan from here on.');
+    return scan ?? fast;
+  }
+  return fast;
 }
