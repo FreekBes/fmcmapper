@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import { cpus } from 'os';
 import sharp from 'sharp';
 sharp.concurrency(1); // keep libvips from fanning out across all cores
+import { MapMeta, writeViewer } from './viewer';
 import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
 import type { TileResult } from './worker';
@@ -130,81 +131,6 @@ async function buildParent(root: string, z: number, x: number, y: number): Promi
 }
 
 // --- Leaflet viewer ---------------------------------------------------------
-function indexHtml(maxZoom: number, minX: number, minZ: number, spawn: { x: number; z: number } | null): string {
-  const initialZoom = Math.max(0, maxZoom - 2);
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Dimension map</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-  html,body,#map{height:100%;margin:0;background:#0b0b0b}
-  /* keep block-pixels crisp when zoomed past native zoom (no smoothing) */
-  .leaflet-tile{image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:crisp-edges}
-  .coord{background:rgba(0,0,0,.6);color:#eee;font:12px/1.4 monospace;padding:4px 8px;border-radius:4px}
-</style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-  var MAXZOOM = ${maxZoom};
-  var MINX = ${minX};     // world block X of native pixel column 0
-  var MINZ = ${minZ};     // world block Z of native pixel row 0
-  var SPAWN = ${spawn ? JSON.stringify(spawn) : 'null'};
-
-  var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: MAXZOOM + 2 });
-
-  L.tileLayer('tiles/{z}/{x}/{y}.png', {
-    tileSize: ${TILE},
-    minZoom: 0,
-    maxZoom: MAXZOOM + 2,    // a couple of upscaled over-zoom steps
-    maxNativeZoom: MAXZOOM,
-    minNativeZoom: 0,ht
-    noWrap: true
-  }).addTo(map);
-
-  // latlng -> Minecraft block coords (native pixel == world block at MAXZOOM)
-  function toBlock(latlng) {
-    var p = map.project(latlng, MAXZOOM);
-    return { x: Math.floor(MINX + p.x), z: Math.floor(MINZ + p.y) };
-  }
-  // Minecraft block coords -> latlng
-  function fromBlock(x, z) {
-    return map.unproject(L.point(x - MINX, z - MINZ), MAXZOOM);
-  }
-
-  var Coords = L.Control.extend({
-    options: { position: 'bottomleft' },
-    onAdd: function () {
-      var d = L.DomUtil.create('div', 'coord');
-      d.textContent = 'move the cursor';
-      this._d = d;
-      return d;
-    },
-    set: function (x, z) { this._d.textContent = 'X ' + x + '   Z ' + z; }
-  });
-  var coords = new Coords();
-  map.addControl(coords);
-  map.on('mousemove', function (e) { var b = toBlock(e.latlng); coords.set(b.x, b.z); });
-
-  if (SPAWN) {
-    var c = fromBlock(SPAWN.x, SPAWN.z);
-    map.setView(c, ${initialZoom});
-    L.circleMarker(c, { radius: 5, weight: 2, color: '#fff', fillColor: '#e33', fillOpacity: 1 })
-      .addTo(map)
-      .bindTooltip('Spawn (' + SPAWN.x + ', ' + SPAWN.z + ')');
-  } else {
-    map.setView([0, 0], 0);
-  }
-</script>
-</body>
-</html>
-`;
-}
-
 // --- main -------------------------------------------------------------------
 async function main(): Promise<void> {
   const [worldPath, dimension = 'minecraft:overworld', outDir = 'tiles_out'] =
@@ -258,7 +184,9 @@ async function main(): Promise<void> {
     console.error(`zoom ${z}: ${made} tiles`);
   }
 
-  writeFileSync(join(outDir, 'index.html'), indexHtml(MAXZOOM, minRx * TILE, minRz * TILE, spawn));
+  const meta: MapMeta = { maxZoom: MAXZOOM, minX: minRx * TILE, minZ: minRz * TILE, tileSize: TILE, spawn, dimension };
+  writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 2));
+  writeViewer(outDir, meta);
   console.error(`done. serve ${outDir}/ over HTTP and open index.html`);
 }
 
