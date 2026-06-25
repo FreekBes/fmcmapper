@@ -5,6 +5,7 @@ import {
 import { join, dirname } from 'path';
 import { cpus } from 'os';
 import sharp from 'sharp';
+sharp.concurrency(1); // keep libvips from fanning out across all cores
 import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
 import type { TileResult } from './worker';
@@ -211,6 +212,10 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Concurrency: default to half the cores to keep temps/CPU down.
+  // Override with TILER_JOBS=N (e.g. TILER_JOBS=2 for very low load).
+  const JOBS = Math.max(1, Number(process.env.TILER_JOBS) || Math.floor(cpus().length / 2));
+
   const regions = listRegions(regionDir(worldPath, dimension));
   if (regions.length === 0) {
     console.error('no region files found');
@@ -228,11 +233,11 @@ async function main(): Promise<void> {
   const tilesRoot = join(outDir, 'tiles');
   mkdirSync(tilesRoot, { recursive: true });
 
-  console.error(`regions: ${regions.length}, base grid: ${Tx}x${Ty}, zooms: 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}`);
+  console.error(`regions: ${regions.length}, base grid: ${Tx}x${Ty}, zooms: 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
 
   // Phase 1: native-zoom base tiles (workers encode PNGs in parallel).
   let written = 0;
-  await pool(regions, cpus().length, runWorker, ({ rx, rz, png }) => {
+  await pool(regions, JOBS, runWorker, ({ rx, rz, png }) => {
     if (!png) return;
     writePng(tilePath(tilesRoot, MAXZOOM, rx - minRx, rz - minRz), png);
     if (++written % 20 === 0) console.error(`base tiles: ${written}`);
@@ -247,7 +252,7 @@ async function main(): Promise<void> {
     const coords: Array<[number, number]> = [];
     for (let x = 0; x < nx; x++) for (let y = 0; y < ny; y++) coords.push([x, y]);
     let made = 0;
-    await pool(coords, cpus().length, ([x, y]) => buildParent(tilesRoot, z, x, y), ok => { if (ok) made++; });
+    await pool(coords, JOBS, ([x, y]) => buildParent(tilesRoot, z, x, y), ok => { if (ok) made++; });
     console.error(`zoom ${z}: ${made} tiles`);
   }
 

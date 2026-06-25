@@ -1,6 +1,7 @@
 import { parentPort, workerData } from 'worker_threads';
 import { readFileSync } from 'fs';
 import sharp from 'sharp';
+sharp.concurrency(1);
 import { AnvilParser } from 'mc-anvil';
 import { topColumns, colorRGB, loadColorTable, EMPTY_HEIGHT } from './chunkmap';
 
