@@ -18,7 +18,7 @@ export const isCompoundList = (t: TagData): t is TagData & { data: ListPayload }
 };
 
 export const isList = (t: TagData): t is TagData & { data: ListPayload } => {
-    return t.type === TagType.LIST && typeof (t.data as ListPayload)?.subType === 'number' && Array.isArray((t.data as ListPayload).data);
+	return t.type === TagType.LIST && typeof (t.data as ListPayload)?.subType === 'number' && Array.isArray((t.data as ListPayload).data);
 };
 
 export const getPrinteableValue = (tag: TagData): string => {
