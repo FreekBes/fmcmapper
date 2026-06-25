@@ -142,6 +142,8 @@ function indexHtml(maxZoom: number, minX: number, minZ: number, spawn: { x: numb
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   html,body,#map{height:100%;margin:0;background:#0b0b0b}
+  /* keep block-pixels crisp when zoomed past native zoom (no smoothing) */
+  .leaflet-tile{image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:crisp-edges}
   .coord{background:rgba(0,0,0,.6);color:#eee;font:12px/1.4 monospace;padding:4px 8px;border-radius:4px}
 </style>
 </head>
@@ -160,7 +162,7 @@ function indexHtml(maxZoom: number, minX: number, minZ: number, spawn: { x: numb
     minZoom: 0,
     maxZoom: MAXZOOM + 2,    // a couple of upscaled over-zoom steps
     maxNativeZoom: MAXZOOM,
-    minNativeZoom: 0,
+    minNativeZoom: 0,ht
     noWrap: true
   }).addTo(map);
 
