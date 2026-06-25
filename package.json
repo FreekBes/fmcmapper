@@ -1,0 +1,20 @@
+{
+  "name": "fmcmapper",
+  "version": "0.0.1",
+  "description": "Minecraft map viewer",
+  "license": "ISC",
+  "author": "Freek Bes",
+  "type": "commonjs",
+  "main": "build/main.js",
+  "scripts": {
+    "start": "node build/main.js",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "mc-anvil": "^2.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,8 @@
+world/*
+output/*
+build/*
+dist/*
+logs/*
+node_modules/*
+*/.DS_Store
+.DS_Store
