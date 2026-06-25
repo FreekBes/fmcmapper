@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "mapcolor_dump",
+  "version": "${version}",
+  "name": "Map Color Dump",
+  "description": "Dumps each block's vanilla map color (id + base RGB + 4 shades) to map_colors.json.",
+  "authors": ["Freek Bes"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["es.freekb.mapcolordump.MapColorDump"]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "*",
+    "fabric-api": "*"
+  }
+}

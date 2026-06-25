@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "mc-anvil": "^2.0.15",
-    "pngjs": "^7.0.0"
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
