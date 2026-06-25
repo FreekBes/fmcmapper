@@ -1,8 +1,25 @@
-world/*
-output/*
-build/*
-dist/*
-logs/*
-node_modules/*
+world/
+output/
+build/
+dist/
+node_modules/
 */.DS_Store
 .DS_Store
+
+
+# MAPCOLORDUMPMOD
+# Gradle / build
+MapColorDumpMod/.gradle/
+MapColorDumpMod/build/
+!MapColorDumpMod/gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+MapColorDumpMod/.idea/
+MapColorDumpMod/*.iml
+MapColorDumpMod/.vscode/
+MapColorDumpMod/.settings/
+MapColorDumpMod/.classpath
+MapColorDumpMod/.project
+
+# Fabric loom
+MapColorDumpMod/run/
