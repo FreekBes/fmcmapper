@@ -162,21 +162,23 @@ export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null
     if (!bs || !(bs.data instanceof ArrayBuffer) || bs.data.byteLength === 0) continue;
 
     const sy = y * 16;
-    const blockNames = new BlockDataParser(bs, pal).getBlockTypeNames();
-    for (let i = 0; i < 4096; i++) {
-      const raw = blockNames[i];
-      if (!raw) continue;
-      const nm = raw.split('(')[0];
-      if (!drawable(nm)) continue;
+    // Resolve name + drawability ONCE per palette entry (palettes are small),
+    // then read only raw palette indices for the 4096 positions instead of a
+    // name string per position. Scan top-down (i descending = y descending) so
+    // the first drawable hit per column is the surface, enabling an early break.
+    const palNames = entries.map(paletteEntryName);
+    const palDrawable = palNames.map(nm => drawable(nm));
+    const raw = new BlockDataParser(bs, pal).getRawBlocks();
+    for (let i = 4095; i >= 0; i--) {
+      const pi = raw[i];
+      if (pi === undefined || !palDrawable[pi]) continue;
       const [lx, ly, lz] = chunkCoordinateFromIndex(i);
       const c = lz * 16 + lx;
-      const absY = sy + ly;
-      if (heights[c] === EMPTY_HEIGHT || absY > heights[c]) {
-        if (names[c] === null) resolved++;
-        names[c] = nm;
-        heights[c] = absY;
-      }
+      if (names[c] !== null) continue; // already have a higher block
+      names[c] = palNames[pi];
+      heights[c] = sy + ly;
+      if (++resolved === 256) break;
     }
   }
   return { ox, oz, names, heights };
-};
+}
