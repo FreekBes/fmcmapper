@@ -100,6 +100,7 @@ export const TINTS: Record<string, Tint> = {
   'minecraft:short_grass': 'grass',
   'minecraft:grass': 'grass', // legacy id (<1.20)
   'minecraft:tall_grass': 'grass',
+  'minecraft:bush': 'grass',
   'minecraft:fern': 'grass',
   'minecraft:large_fern': 'grass',
   'minecraft:potted_fern': 'grass',
