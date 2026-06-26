@@ -108,3 +108,59 @@ javac --version
   top-down map keyed by block name. For per-state colors (e.g.
   `grass_block[snowy=true]`), iterate the block's possible states instead of
   its default state.
+
+## Biome colors (grass / foliage / water)
+
+This mod also writes `biome_colors.json` (resolved grass, foliage, and water
+color per biome), used to tint the map by biome for a Bedrock-style look.
+
+Grass and foliage colors are looked up from the colormap textures. Instead of
+needing the client, drop the two PNGs into the **run directory** and the mod
+seeds vanilla's colormaps from them, so it resolves correctly even headless.
+
+> Note: `grass.png` / `foliage.png` are Mojang game files. Extract them from
+> your **own** client jar and keep them only in `run/` (which is gitignored) —
+> do not commit or redistribute them. See Minecraft's usage guidelines.
+
+The colormaps live inside the client jar, not in `.minecraft/assets` (that is a
+hash-named blob store). Extract them from a jar you own:
+
+```
+JAR=~/.minecraft/versions/26.1.2/26.1.2.jar          # adjust to your path
+unzip -l "$JAR" | grep colormap                       # confirm the paths
+unzip -j "$JAR" assets/minecraft/textures/colormap/grass.png \
+                assets/minecraft/textures/colormap/foliage.png -d run/
+```
+
+Then build and run headless:
+
+```
+export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
+./gradlew runServer
+```
+
+You should see:
+
+```
+[map-color-dump] loaded colormap .../run/grass.png
+[map-color-dump] loaded colormap .../run/foliage.png
+[map-color-dump] wrote .../run/map_colors.json (N blocks)
+[map-color-dump] wrote .../run/biome_colors.json (M biomes)
+```
+
+A `-1` grass/foliage warning means the PNGs weren't found in `run/` (or weren't
+256x256). Water color is server-side and is correct regardless.
+
+Format:
+
+```json
+{
+  "minecraft:plains": {
+    "grass":   { "RGB": 9551193, "hex": "#91BD59" },
+    "foliage": { "RGB": 7842607, "hex": "#77AB2F" },
+    "water":   { "RGB": 4159204, "hex": "#3F76E4" }
+  }
+}
+```
+
+`RGB` is a packed `0xRRGGBB` int (`-1` = not resolved); `hex` is for eyeballing.

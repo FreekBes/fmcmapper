@@ -1,0 +1,912 @@
+{
+  "minecraft:badlands": {
+    "grass": {
+      "RGB": 9470285,
+      "hex": "#90814D"
+    },
+    "foliage": {
+      "RGB": 10387789,
+      "hex": "#9E814D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:bamboo_jungle": {
+    "grass": {
+      "RGB": 5884220,
+      "hex": "#59C93C"
+    },
+    "foliage": {
+      "RGB": 3193611,
+      "hex": "#30BB0B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:basalt_deltas": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:beach": {
+    "grass": {
+      "RGB": 9551193,
+      "hex": "#91BD59"
+    },
+    "foliage": {
+      "RGB": 7842607,
+      "hex": "#77AB2F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:birch_forest": {
+    "grass": {
+      "RGB": 8960870,
+      "hex": "#88BB66"
+    },
+    "foliage": {
+      "RGB": 7055680,
+      "hex": "#6BA940"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:cherry_grove": {
+    "grass": {
+      "RGB": 11983713,
+      "hex": "#B6DB61"
+    },
+    "foliage": {
+      "RGB": 11983713,
+      "hex": "#B6DB61"
+    },
+    "water": {
+      "RGB": 6141935,
+      "hex": "#5DB7EF"
+    }
+  },
+  "minecraft:cold_ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4020182,
+      "hex": "#3D57D6"
+    }
+  },
+  "minecraft:crimson_forest": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:dark_forest": {
+    "grass": {
+      "RGB": 5274162,
+      "hex": "#507A32"
+    },
+    "foliage": {
+      "RGB": 5877296,
+      "hex": "#59AE30"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:deep_cold_ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4020182,
+      "hex": "#3D57D6"
+    }
+  },
+  "minecraft:deep_dark": {
+    "grass": {
+      "RGB": 9551193,
+      "hex": "#91BD59"
+    },
+    "foliage": {
+      "RGB": 7842607,
+      "hex": "#77AB2F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:deep_frozen_ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 3750089,
+      "hex": "#3938C9"
+    }
+  },
+  "minecraft:deep_lukewarm_ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4566514,
+      "hex": "#45ADF2"
+    }
+  },
+  "minecraft:deep_ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:desert": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:dripstone_caves": {
+    "grass": {
+      "RGB": 9551193,
+      "hex": "#91BD59"
+    },
+    "foliage": {
+      "RGB": 7842607,
+      "hex": "#77AB2F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:end_barrens": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:end_highlands": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:end_midlands": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:eroded_badlands": {
+    "grass": {
+      "RGB": 9470285,
+      "hex": "#90814D"
+    },
+    "foliage": {
+      "RGB": 10387789,
+      "hex": "#9E814D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:flower_forest": {
+    "grass": {
+      "RGB": 7979098,
+      "hex": "#79C05A"
+    },
+    "foliage": {
+      "RGB": 5877296,
+      "hex": "#59AE30"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:forest": {
+    "grass": {
+      "RGB": 7979098,
+      "hex": "#79C05A"
+    },
+    "foliage": {
+      "RGB": 5877296,
+      "hex": "#59AE30"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:frozen_ocean": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 3750089,
+      "hex": "#3938C9"
+    }
+  },
+  "minecraft:frozen_peaks": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:frozen_river": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 3750089,
+      "hex": "#3938C9"
+    }
+  },
+  "minecraft:grove": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:ice_spikes": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:jagged_peaks": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:jungle": {
+    "grass": {
+      "RGB": 5884220,
+      "hex": "#59C93C"
+    },
+    "foliage": {
+      "RGB": 3193611,
+      "hex": "#30BB0B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:lukewarm_ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4566514,
+      "hex": "#45ADF2"
+    }
+  },
+  "minecraft:lush_caves": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:mangrove_swamp": {
+    "grass": {
+      "RGB": 6975545,
+      "hex": "#6A7039"
+    },
+    "foliage": {
+      "RGB": 9285927,
+      "hex": "#8DB127"
+    },
+    "water": {
+      "RGB": 3832426,
+      "hex": "#3A7A6A"
+    }
+  },
+  "minecraft:meadow": {
+    "grass": {
+      "RGB": 8633197,
+      "hex": "#83BB6D"
+    },
+    "foliage": {
+      "RGB": 6531400,
+      "hex": "#63A948"
+    },
+    "water": {
+      "RGB": 937679,
+      "hex": "#0E4ECF"
+    }
+  },
+  "minecraft:mushroom_fields": {
+    "grass": {
+      "RGB": 5622079,
+      "hex": "#55C93F"
+    },
+    "foliage": {
+      "RGB": 2865935,
+      "hex": "#2BBB0F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:nether_wastes": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:old_growth_birch_forest": {
+    "grass": {
+      "RGB": 8960870,
+      "hex": "#88BB66"
+    },
+    "foliage": {
+      "RGB": 7055680,
+      "hex": "#6BA940"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:old_growth_pine_taiga": {
+    "grass": {
+      "RGB": 8829055,
+      "hex": "#86B87F"
+    },
+    "foliage": {
+      "RGB": 6858079,
+      "hex": "#68A55F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:old_growth_spruce_taiga": {
+    "grass": {
+      "RGB": 8828803,
+      "hex": "#86B783"
+    },
+    "foliage": {
+      "RGB": 6857828,
+      "hex": "#68A464"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:pale_garden": {
+    "grass": {
+      "RGB": 7832178,
+      "hex": "#778272"
+    },
+    "foliage": {
+      "RGB": 8883574,
+      "hex": "#878D76"
+    },
+    "water": {
+      "RGB": 7768221,
+      "hex": "#76889D"
+    }
+  },
+  "minecraft:plains": {
+    "grass": {
+      "RGB": 9551193,
+      "hex": "#91BD59"
+    },
+    "foliage": {
+      "RGB": 7842607,
+      "hex": "#77AB2F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:river": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:savanna": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:savanna_plateau": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:small_end_islands": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:snowy_beach": {
+    "grass": {
+      "RGB": 8631699,
+      "hex": "#83B593"
+    },
+    "foliage": {
+      "RGB": 6595192,
+      "hex": "#64A278"
+    },
+    "water": {
+      "RGB": 4020182,
+      "hex": "#3D57D6"
+    }
+  },
+  "minecraft:snowy_plains": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:snowy_slopes": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:snowy_taiga": {
+    "grass": {
+      "RGB": 8434839,
+      "hex": "#80B497"
+    },
+    "foliage": {
+      "RGB": 6332795,
+      "hex": "#60A17B"
+    },
+    "water": {
+      "RGB": 4020182,
+      "hex": "#3D57D6"
+    }
+  },
+  "minecraft:soul_sand_valley": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:sparse_jungle": {
+    "grass": {
+      "RGB": 6604607,
+      "hex": "#64C73F"
+    },
+    "foliage": {
+      "RGB": 4110351,
+      "hex": "#3EB80F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:stony_peaks": {
+    "grass": {
+      "RGB": 10141259,
+      "hex": "#9ABE4B"
+    },
+    "foliage": {
+      "RGB": 8563742,
+      "hex": "#82AC1E"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:stony_shore": {
+    "grass": {
+      "RGB": 9090697,
+      "hex": "#8AB689"
+    },
+    "foliage": {
+      "RGB": 7185259,
+      "hex": "#6DA36B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:sunflower_plains": {
+    "grass": {
+      "RGB": 9551193,
+      "hex": "#91BD59"
+    },
+    "foliage": {
+      "RGB": 7842607,
+      "hex": "#77AB2F"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:swamp": {
+    "grass": {
+      "RGB": 6975545,
+      "hex": "#6A7039"
+    },
+    "foliage": {
+      "RGB": 6975545,
+      "hex": "#6A7039"
+    },
+    "water": {
+      "RGB": 6388580,
+      "hex": "#617B64"
+    }
+  },
+  "minecraft:taiga": {
+    "grass": {
+      "RGB": 8828803,
+      "hex": "#86B783"
+    },
+    "foliage": {
+      "RGB": 6857828,
+      "hex": "#68A464"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:the_end": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:the_void": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:warm_ocean": {
+    "grass": {
+      "RGB": 9353585,
+      "hex": "#8EB971"
+    },
+    "foliage": {
+      "RGB": 7448397,
+      "hex": "#71A74D"
+    },
+    "water": {
+      "RGB": 4445678,
+      "hex": "#43D5EE"
+    }
+  },
+  "minecraft:warped_forest": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:windswept_forest": {
+    "grass": {
+      "RGB": 9090697,
+      "hex": "#8AB689"
+    },
+    "foliage": {
+      "RGB": 7185259,
+      "hex": "#6DA36B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:windswept_gravelly_hills": {
+    "grass": {
+      "RGB": 9090697,
+      "hex": "#8AB689"
+    },
+    "foliage": {
+      "RGB": 7185259,
+      "hex": "#6DA36B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:windswept_hills": {
+    "grass": {
+      "RGB": 9090697,
+      "hex": "#8AB689"
+    },
+    "foliage": {
+      "RGB": 7185259,
+      "hex": "#6DA36B"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:windswept_savanna": {
+    "grass": {
+      "RGB": 12564309,
+      "hex": "#BFB755"
+    },
+    "foliage": {
+      "RGB": 11445290,
+      "hex": "#AEA42A"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  },
+  "minecraft:wooded_badlands": {
+    "grass": {
+      "RGB": 9470285,
+      "hex": "#90814D"
+    },
+    "foliage": {
+      "RGB": 10387789,
+      "hex": "#9E814D"
+    },
+    "water": {
+      "RGB": 4159204,
+      "hex": "#3F76E4"
+    }
+  }
+}
