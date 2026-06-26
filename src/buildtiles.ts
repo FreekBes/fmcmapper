@@ -1,6 +1,6 @@
 import { Worker } from 'worker_threads';
 import {
-  readdirSync, existsSync, mkdirSync, writeFileSync, readFileSync,
+  readdirSync, existsSync, mkdirSync, writeFileSync, readFileSync, statSync, unlinkSync, rmSync,
 } from 'fs';
 import { join, dirname } from 'path';
 import { cpus } from 'os';
@@ -12,6 +12,8 @@ import type { TagData } from 'mc-anvil';
 import type { TileResult } from './worker';
 
 const TILE = 512; // Leaflet tileSize; one base tile == one region
+const MANIFEST = 'render-manifest.json';
+const MANIFEST_VERSION = 1;
 
 // --- region folder resolution (modern layout + legacy fallback) -------------
 function regionDir(worldPath: string, dimension: string): string {
@@ -31,6 +33,7 @@ function regionDir(worldPath: string, dimension: string): string {
 }
 
 type RegionFile = { file: string; rx: number; rz: number };
+type Job = RegionFile & { since: number; mtimeMs: number };
 
 function listRegions(dir: string): RegionFile[] {
   const out: RegionFile[] = [];
@@ -39,6 +42,42 @@ function listRegions(dir: string): RegionFile[] {
     if (m) out.push({ file: join(dir, f), rx: +m[1], rz: +m[2] });
   }
   return out;
+}
+
+// --- render manifest (incremental state) ------------------------------------
+type RegionEntry = { lastUpdate: number; mtimeMs: number };
+type Manifest = {
+  version: number;
+  dimension: string;
+  tileSize: number;
+  originRx: number;
+  originRz: number;
+  maxZoom: number;
+  regions: Record<string, RegionEntry>;
+};
+
+function loadManifest(outDir: string): Manifest | null {
+  const f = join(outDir, MANIFEST);
+  if (!existsSync(f)) return null;
+  try {
+    const m = JSON.parse(readFileSync(f, 'utf8')) as Manifest;
+    if (m && m.version === MANIFEST_VERSION && m.regions) return m;
+  } catch { /* fall through to full rebuild */ }
+  return null;
+}
+
+// Can we reuse the cached tile grid? Only if dimension/tileSize match and every
+// current region still maps into the cached origin + maxZoom envelope (else the
+// tile coordinates would shift and the whole pyramid is invalid).
+function reusable(m: Manifest | null, dimension: string, regions: RegionFile[]): m is Manifest {
+  if (!m || m.dimension !== dimension || m.tileSize !== TILE) return false;
+  const grid = 2 ** m.maxZoom;
+  for (const r of regions) {
+    const tx = r.rx - m.originRx;
+    const ty = r.rz - m.originRz;
+    if (tx < 0 || ty < 0 || tx >= grid || ty >= grid) return false;
+  }
+  return true;
 }
 
 // --- spawn from level.dat ---------------------------------------------------
@@ -50,17 +89,13 @@ function readSpawn(worldPath: string): { x: number; z: number } | null {
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     const root = new NBTParser(ab).getTag() as TagData; // NBTParser auto-gunzips
 
-    // Current layout: Data/spawn { pos: int[ x, y, z ], yaw, pitch, dimension }
     const pos = findChildTagAtPath('Data/spawn/pos', root);
     if (pos && Array.isArray(pos.data) && pos.data.length >= 3) {
       return { x: Number(pos.data[0]), z: Number(pos.data[2]) };
     }
-
-    // Legacy layout: Data/SpawnX, Data/SpawnZ
     const sx = findChildTagAtPath('Data/SpawnX', root);
     const sz = findChildTagAtPath('Data/SpawnZ', root);
     if (sx && sz) return { x: Number(sx.data), z: Number(sz.data) };
-
     return null;
   } catch {
     return null;
@@ -68,7 +103,7 @@ function readSpawn(worldPath: string): { x: number; z: number } | null {
 }
 
 // --- worker pool ------------------------------------------------------------
-function runWorker(job: RegionFile): Promise<TileResult> {
+function runWorker(job: Job): Promise<TileResult> {
   return new Promise((resolve, reject) => {
     const w = new Worker(join(__dirname, 'worker.js'), { workerData: job });
     w.once('message', (msg: TileResult) => {
@@ -87,7 +122,7 @@ async function pool<T, R>(
 ): Promise<void> {
   let i = 0;
   const runners = Array.from(
-    { length: Math.max(1, Math.min(limit, items.length)) },
+    { length: Math.max(1, Math.min(limit, items.length || 1)) },
     async () => {
       while (i < items.length) onResult(await fn(items[i++]));
     },
@@ -102,6 +137,11 @@ const tilePath = (root: string, z: number, x: number, y: number): string =>
 function writePng(p: string, buf: Buffer): void {
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, buf);
+}
+
+function rmTile(root: string, z: number, x: number, y: number): void {
+  const p = tilePath(root, z, x, y);
+  try { if (existsSync(p)) unlinkSync(p); } catch { /* ignore */ }
 }
 
 // Build one overview tile by compositing up to 4 children (z+1) and halving.
@@ -130,7 +170,6 @@ async function buildParent(root: string, z: number, x: number, y: number): Promi
   return true;
 }
 
-// --- Leaflet viewer ---------------------------------------------------------
 // --- main -------------------------------------------------------------------
 async function main(): Promise<void> {
   const [worldPath, dimension = 'minecraft:overworld', outDir = 'tiles_out'] =
@@ -141,8 +180,8 @@ async function main(): Promise<void> {
   }
 
   // Concurrency: default to half the cores to keep temps/CPU down.
-  // Override with TILER_JOBS=N (e.g. TILER_JOBS=2 for very low load).
   const JOBS = Math.max(1, Number(process.env.TILER_JOBS) || Math.floor(cpus().length / 2));
+  const forceFull = process.env.TILER_FULL === '1' || process.env.TILER_FULL === 'true';
 
   const regions = listRegions(regionDir(worldPath, dimension));
   if (regions.length === 0) {
@@ -157,37 +196,107 @@ async function main(): Promise<void> {
   const maxRz = Math.max(...regions.map(r => r.rz));
   const Tx = maxRx - minRx + 1;
   const Ty = maxRz - minRz + 1;
-  const MAXZOOM = Math.ceil(Math.log2(Math.max(Tx, Ty, 1)));
+
+  const cached = loadManifest(outDir);
+  const incr = !forceFull && reusable(cached, dimension, regions);
+
+  const originRx = incr ? cached.originRx : minRx;
+  const originRz = incr ? cached.originRz : minRz;
+  const MAXZOOM = incr ? cached.maxZoom : Math.ceil(Math.log2(Math.max(Tx, Ty, 1)));
+  const prevRegions: Record<string, RegionEntry> = incr ? cached.regions : {};
+  const grid = 2 ** MAXZOOM;
+
   const tilesRoot = join(outDir, 'tiles');
+  if (!incr) rmSync(tilesRoot, { recursive: true, force: true }); // clean full rebuild
   mkdirSync(tilesRoot, { recursive: true });
 
-  console.error(`regions: ${regions.length}, base grid: ${Tx}x${Ty}, zooms: 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
+  const reason = incr ? '' : ` (${forceFull ? 'forced' : cached ? 'world grew/changed' : 'first run'})`;
+  console.error(`${incr ? 'incremental' : 'full'} build${reason} — regions: ${regions.length}, grid base ${Tx}x${Ty}, origin (${originRx},${originRz}), zooms 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
 
-  // Phase 1: native-zoom base tiles (workers encode PNGs in parallel).
-  let written = 0;
-  await pool(regions, JOBS, runWorker, ({ rx, rz, png }) => {
-    if (!png) return;
-    writePng(tilePath(tilesRoot, MAXZOOM, rx - minRx, rz - minRz), png);
-    if (++written % 20 === 0) console.error(`base tiles: ${written}`);
-  });
-  console.error(`base tiles written: ${written}`);
-
-  // Phase 2: overviews, one zoom at a time, parallel within a zoom.
-  for (let z = MAXZOOM - 1; z >= 0; z--) {
-    const span = 2 ** (MAXZOOM - z);
-    const nx = Math.ceil(Tx / span);
-    const ny = Math.ceil(Ty / span);
-    const coords: Array<[number, number]> = [];
-    for (let x = 0; x < nx; x++) for (let y = 0; y < ny; y++) coords.push([x, y]);
-    let made = 0;
-    await pool(coords, JOBS, ([x, y]) => buildParent(tilesRoot, z, x, y), ok => { if (ok) made++; });
-    console.error(`zoom ${z}: ${made} tiles`);
+  // Decide which regions to hand to workers. Files whose mtime is unchanged are
+  // skipped without parsing at all.
+  const presentKeys = new Set(regions.map(r => `${r.rx},${r.rz}`));
+  const newRegions: Record<string, RegionEntry> = {};
+  const baseDirty = new Set<string>(); // "tx,ty" at MAXZOOM
+  const jobs: Job[] = [];
+  let skippedFile = 0;
+  for (const r of regions) {
+    const key = `${r.rx},${r.rz}`;
+    const prev = prevRegions[key];
+    let mtimeMs = 0;
+    try { mtimeMs = statSync(r.file).mtimeMs; } catch { /* treat as changed */ }
+    if (incr && prev && prev.mtimeMs === mtimeMs) {
+      newRegions[key] = prev; // unchanged file -> keep tile + entry
+      skippedFile++;
+      continue;
+    }
+    jobs.push({ file: r.file, rx: r.rx, rz: r.rz, since: prev ? prev.lastUpdate : -1, mtimeMs });
   }
 
-  const meta: MapMeta = { maxZoom: MAXZOOM, minX: minRx * TILE, minZ: minRz * TILE, tileSize: TILE, spawn, dimension };
+  // Phase 1: (re)render changed base tiles.
+  let rendered = 0;
+  let skippedLU = 0;
+  await pool(jobs, JOBS, runWorker, (res) => {
+    const key = `${res.rx},${res.rz}`;
+    newRegions[key] = { lastUpdate: res.lastUpdate, mtimeMs: res.mtimeMs };
+    if (!res.rendered) { skippedLU++; return; }
+    const tx = res.rx - originRx;
+    const ty = res.rz - originRz;
+    if (res.png) writePng(tilePath(tilesRoot, MAXZOOM, tx, ty), res.png);
+    else rmTile(tilesRoot, MAXZOOM, tx, ty); // region became empty
+    baseDirty.add(`${tx},${ty}`);
+    if (++rendered % 20 === 0) console.error(`rendered: ${rendered}`);
+  });
+
+  // Regions that disappeared since last run: drop their tile, dirty the parents.
+  let deleted = 0;
+  for (const key of Object.keys(prevRegions)) {
+    if (presentKeys.has(key)) continue;
+    const [drx, drz] = key.split(',').map(Number);
+    const tx = drx - originRx;
+    const ty = drz - originRz;
+    if (tx >= 0 && ty >= 0 && tx < grid && ty < grid) {
+      rmTile(tilesRoot, MAXZOOM, tx, ty);
+      baseDirty.add(`${tx},${ty}`);
+    }
+    deleted++;
+  }
+  console.error(`base: rendered ${rendered}, unchanged-file ${skippedFile}, unchanged-content ${skippedLU}, deleted ${deleted}`);
+
+  // Phase 2: rebuild only the overview tiles above something that changed.
+  let dirty = baseDirty;
+  for (let z = MAXZOOM - 1; z >= 0; z--) {
+    const parents = new Set<string>();
+    for (const k of dirty) {
+      const [x, y] = k.split(',').map(Number);
+      parents.add(`${x >> 1},${y >> 1}`);
+    }
+    const arr = [...parents].map(k => k.split(',').map(Number) as [number, number]);
+    let made = 0;
+    await pool(arr, JOBS, async ([x, y]) => {
+      const ok = await buildParent(tilesRoot, z, x, y);
+      if (!ok) rmTile(tilesRoot, z, x, y); // all children gone
+      return ok;
+    }, ok => { if (ok) made++; });
+    if (arr.length) console.error(`zoom ${z}: ${made}/${arr.length} tiles`);
+    dirty = parents;
+  }
+
+  const manifestOut: Manifest = {
+    version: MANIFEST_VERSION,
+    dimension,
+    tileSize: TILE,
+    originRx,
+    originRz,
+    maxZoom: MAXZOOM,
+    regions: newRegions,
+  };
+  writeFileSync(join(outDir, MANIFEST), JSON.stringify(manifestOut));
+
+  const meta: MapMeta = { maxZoom: MAXZOOM, minX: originRx * TILE, minZ: originRz * TILE, tileSize: TILE, spawn, dimension };
   writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 2));
   writeViewer(outDir, meta);
-  console.error(`done. serve ${outDir}/ over HTTP and open index.html`);
+  console.error(`done (${incr ? 'incremental' : 'full'}). serve ${outDir}/ over HTTP and open index.html`);
 }
 
 main().catch(e => {
