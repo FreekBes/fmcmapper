@@ -19,8 +19,8 @@ const MANIFEST_VERSION = 1;
 // biome_colors.json and the TINTS table in chunkmap.ts were generated against
 // it; if a world reports a different DataVersion the colors may be stale and
 // should be regenerated with the map-color-dump mod for that version.
-const TARGET_VERSION = '26.1.2';
-const TARGET_DATA_VERSION = 4790;
+const TARGET_VERSION = '26.2';
+const TARGET_DATA_VERSION = 4903;
 
 // --- region folder resolution (modern layout + legacy fallback) -------------
 function regionDir(worldPath: string, dimension: string): string {

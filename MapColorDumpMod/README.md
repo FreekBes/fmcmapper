@@ -1,7 +1,7 @@
 # map-color-dump
 
 A tiny Fabric mod that writes every block's **vanilla map color** to
-`map_colors.json`. Run it once on your Minecraft version (26.1.2) to get an
+`map_colors.json`. Run it once on your Minecraft version (26.2) to get an
 authoritative `block -> color` table you can feed into the map tiler.
 
 ## Output
@@ -28,10 +28,10 @@ authoritative `block -> color` table you can feed into the map tiler.
 
 ## Requirements
 
-- A full **JDK 25** (not just a JRE — the build needs `javac`). Minecraft 26.1.2
+- A full **JDK 25** (not just a JRE — the build needs `javac`). Minecraft 26.2
   requires Java 25, and loom checks the JVM Gradle runs on.
 - No Gradle install needed; the Gradle wrapper (`./gradlew`, Gradle 9.5.0) is
-  bundled. Versions for 26.1.2 are already filled in `gradle.properties`.
+  bundled. Versions for 26.2 are already filled in `gradle.properties`.
 
 Verify you have a JDK (this must print a version, not error):
 
@@ -91,7 +91,7 @@ javac --version
    The file is at `run/map_colors.json`.
 
    **Alternative — your own server:** drop `build/libs/mapcolor-dump-1.0.0.jar`
-   plus the Fabric API jar into a 26.1.2 Fabric server's `mods/`, start once,
+   plus the Fabric API jar into a 26.2 Fabric server's `mods/`, start once,
    and collect `map_colors.json` from the server folder. (Running only needs a
    JRE 25; compiling needs the JDK.)
 
@@ -126,7 +126,7 @@ The colormaps live inside the client jar, not in `.minecraft/assets` (that is a
 hash-named blob store). Extract them from a jar you own:
 
 ```
-JAR=~/.minecraft/versions/26.1.2/26.1.2.jar          # adjust to your path
+JAR=~/.minecraft/versions/26.2/26.2.jar               # adjust to your path
 unzip -l "$JAR" | grep colormap                       # confirm the paths
 unzip -j "$JAR" assets/minecraft/textures/colormap/grass.png \
                 assets/minecraft/textures/colormap/foliage.png -d run/
