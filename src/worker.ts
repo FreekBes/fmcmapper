@@ -19,6 +19,9 @@ const table = loadColorTable(process.env.MAP_COLORS_PATH);
 const biomeColors = loadBiomeColors(process.env.BIOME_COLORS_PATH);
 // Overall darkening (1 = none). Water also gets depth-based shading below.
 const BRIGHTNESS = process.env.MAP_BRIGHTNESS !== undefined ? Number(process.env.MAP_BRIGHTNESS) : 0.9;
+// Leaves are a dark texture x the biome tint in-game; the raw tint alone is too
+// bright, so darken leaf blocks extra (foliage-tinted + fixed birch/spruce).
+const FOLIAGE = process.env.MAP_FOLIAGE_BRIGHTNESS !== undefined ? Number(process.env.MAP_FOLIAGE_BRIGHTNESS) : 0.65;
 
 const baseX = rx * SIZE;
 const baseZ = rz * SIZE;
@@ -87,6 +90,8 @@ async function run(): Promise<void> {
           const d0 = depth[idx] * 0.1 + ((lx + lz) & 1) * 0.2;
           shadeIndex = d0 < 0.5 ? 2 : d0 > 0.9 ? 0 : 1;
         }
+        // Leaf blocks (foliage tint, or fixed birch/spruce) get extra darkening.
+        const isLeaf = tint === 'foliage' || typeof tint === 'number';
         let r: number, g: number, b: number;
         if (tint === undefined) {
           [r, g, b] = colorRGB(table, nm, shadeIndex);
@@ -101,10 +106,11 @@ async function run(): Promise<void> {
           }
           [r, g, b] = base >= 0 ? shadeRGB(base, shadeIndex) : colorRGB(table, nm, shadeIndex);
         }
+        const f = isLeaf ? BRIGHTNESS * FOLIAGE : BRIGHTNESS;
         const p = idx * 4;
-        rgba[p] = Math.min(255, Math.round(r * BRIGHTNESS));
-        rgba[p + 1] = Math.min(255, Math.round(g * BRIGHTNESS));
-        rgba[p + 2] = Math.min(255, Math.round(b * BRIGHTNESS));
+        rgba[p] = Math.min(255, Math.round(r * f));
+        rgba[p + 1] = Math.min(255, Math.round(g * f));
+        rgba[p + 2] = Math.min(255, Math.round(b * f));
         rgba[p + 3] = 255;
       }
     }
