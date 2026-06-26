@@ -3,7 +3,9 @@ import { readFileSync } from 'fs';
 import sharp from 'sharp';
 sharp.concurrency(1);
 import { AnvilParser } from 'mc-anvil';
-import { topColumns, colorRGB, loadColorTable, EMPTY_HEIGHT } from './chunkmap';
+import {
+  topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, TINTS, EMPTY_HEIGHT,
+} from './chunkmap';
 
 const SIZE = 512; // one region = 512x512 blocks
 
@@ -12,12 +14,14 @@ export type TileResult = { rx: number; rz: number; png: Buffer | null };
 
 const { file, rx, rz } = workerData as Job;
 
-// Loaded once per worker. Override path with MAP_COLORS_PATH if needed.
+// Loaded once per worker. Override paths with MAP_COLORS_PATH / BIOME_COLORS_PATH.
 const table = loadColorTable(process.env.MAP_COLORS_PATH);
+const biomeColors = loadBiomeColors(process.env.BIOME_COLORS_PATH);
 
 const baseX = rx * SIZE;
 const baseZ = rz * SIZE;
 const name: (string | null)[] = new Array(SIZE * SIZE).fill(null);
+const biome: (string | null)[] = new Array(SIZE * SIZE).fill(null);
 const height = new Int32Array(SIZE * SIZE).fill(EMPTY_HEIGHT);
 let any = false;
 
@@ -39,6 +43,7 @@ for (const chunk of chunks) {
       if (lx < 0 || lx >= SIZE || lz < 0 || lz >= SIZE) continue;
       const idx = lz * SIZE + lx;
       name[idx] = nm;
+      biome[idx] = cols.biomes[cc];
       height[idx] = cols.heights[cc];
       any = true;
     }
@@ -67,7 +72,25 @@ async function run(): Promise<void> {
           }
         }
 
-        const [r, g, b] = colorRGB(table, nm, shadeIndex);
+        // Biome tint: grass/foliage/water blocks take the biome color as their
+        // base (then the same shade); fixed-color leaves use their constant;
+        // everything else uses its map color. Falls back to the map color when
+        // there's no biome data or the color is unresolved (-1).
+        const tint = TINTS[nm];
+        let r: number, g: number, b: number;
+        if (tint === undefined) {
+          [r, g, b] = colorRGB(table, nm, shadeIndex);
+        } else {
+          let base = -1;
+          if (typeof tint === 'number') {
+            base = tint;
+          } else {
+            const bn = biome[idx];
+            const bc = bn ? biomeColors.get(bn) : undefined;
+            if (bc) base = tint === 'grass' ? bc.grass : tint === 'foliage' ? bc.foliage : bc.water;
+          }
+          [r, g, b] = base >= 0 ? shadeRGB(base, shadeIndex) : colorRGB(table, nm, shadeIndex);
+        }
         const p = idx * 4;
         rgba[p] = r;
         rgba[p + 1] = g;

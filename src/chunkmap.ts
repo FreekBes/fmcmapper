@@ -54,6 +54,68 @@ export function colorRGB(table: ColorTable, name: string, shadeIndex: number): [
   return [(packed >> 16) & 0xff, (packed >> 8) & 0xff, packed & 0xff];
 }
 
+// Apply the map shade multiplier (x180/220/255) to an arbitrary base color,
+// e.g. a biome grass/foliage/water color. Matches the mod's integer math.
+export function shadeRGB(rgb: number, shadeIndex: number): [number, number, number] {
+  const mul = FALLBACK_MUL[shadeIndex] ?? 220;
+  const sh = (c: number) => Math.floor((c * mul) / 255) & 0xff;
+  return [sh((rgb >> 16) & 0xff), sh((rgb >> 8) & 0xff), sh(rgb & 0xff)];
+}
+
+// ---------------------------------------------------------------------------
+// Per-biome colors (from the Fabric mod's biome_colors.json) + tint rules
+// ---------------------------------------------------------------------------
+
+export type BiomeColor = { grass: number; foliage: number; water: number }; // RGB, -1 = none
+export type BiomeColors = Map<string, BiomeColor>;
+
+type RawBiome = { grass?: { RGB?: number }; foliage?: { RGB?: number }; water?: { RGB?: number } };
+
+export function loadBiomeColors(
+  file: string = resolve(process.cwd(), 'assets/biome_colors.json'),
+): BiomeColors {
+  let raw: Record<string, RawBiome>;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, RawBiome>;
+  } catch {
+    return new Map(); // no file -> tinting simply doesn't apply
+  }
+  const m: BiomeColors = new Map();
+  for (const [name, v] of Object.entries(raw)) {
+    m.set(name, {
+      grass: v.grass?.RGB ?? -1,
+      foliage: v.foliage?.RGB ?? -1,
+      water: v.water?.RGB ?? -1,
+    });
+  }
+  return m;
+}
+
+// How a block is colored: by biome grass/foliage/water tint, a fixed RGB
+// (leaves with a constant color), or — if absent here — its plain map color.
+export type Tint = 'grass' | 'foliage' | 'water' | number;
+
+export const TINTS: Record<string, Tint> = {
+  'minecraft:grass_block': 'grass',
+  'minecraft:short_grass': 'grass',
+  'minecraft:grass': 'grass', // legacy id (<1.20)
+  'minecraft:tall_grass': 'grass',
+  'minecraft:fern': 'grass',
+  'minecraft:large_fern': 'grass',
+  'minecraft:potted_fern': 'grass',
+  'minecraft:sugar_cane': 'grass',
+  'minecraft:oak_leaves': 'foliage',
+  'minecraft:jungle_leaves': 'foliage',
+  'minecraft:acacia_leaves': 'foliage',
+  'minecraft:dark_oak_leaves': 'foliage',
+  'minecraft:mangrove_leaves': 'foliage',
+  'minecraft:vine': 'foliage',
+  'minecraft:water': 'water',
+  // Leaves with a fixed (non-biome) color:
+  'minecraft:birch_leaves': 0x80a755,
+  'minecraft:spruce_leaves': 0x619961,
+};
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
@@ -107,12 +169,37 @@ const drawable = (nm: string, table: ColorTable): boolean => {
 
 export const EMPTY_HEIGHT = -2147483648;
 
-export type ChunkColumns = {
+type Columns = {
   ox: number;
   oz: number;
   names: (string | null)[]; // [z*16 + x], topmost drawable block name, or null
   heights: Int32Array; // [z*16 + x], world Y of that block, or EMPTY_HEIGHT
 };
+
+export type ChunkColumns = Columns & {
+  biomes: (string | null)[]; // [z*16 + x], biome id at that surface block, or null
+};
+
+// Big-endian long extractor shared by the block and biome readers. Reads value
+// `i` from a paletted-container LONG_ARRAY: value j sits at bit j*bits from the
+// LSB, top (64 % bits) bits are padding. Verified against mc-anvil's decoder.
+function packedExtractor(data: ArrayBuffer, bits: number): (i: number) => number {
+  const valuesPerLong = Math.floor(64 / bits);
+  const mask = (1n << BigInt(bits)) - 1n;
+  const n = Math.floor(data.byteLength / 8);
+  const view = new DataView(data);
+  const longs = new BigUint64Array(n);
+  for (let k = 0; k < n; k++) longs[k] = view.getBigUint64(k * 8, false);
+  return (i: number): number => {
+    const j = i % valuesPerLong;
+    const k = (i - j) / valuesPerLong;
+    if (k >= n) return -1;
+    return Number((longs[k] >> BigInt(j * bits)) & mask);
+  };
+}
+
+// ceil(log2(n)) for a palette of n entries (== bits-per-value before any floor).
+const paletteBits = (n: number): number => Math.floor(Math.log2((n - 1) || 1)) + 1;
 
 // ---------------------------------------------------------------------------
 // Single-section random-access reader
@@ -142,24 +229,80 @@ function buildReader(section: TagData[], table: ColorTable): SectionReader | nul
   }
   if (!bs || !(bs.data instanceof ArrayBuffer) || bs.data.byteLength === 0) return null;
 
-  const paletteSize = entries.length;
-  const l = Math.floor(Math.log2((paletteSize - 1) || 1)) + 1;
-  const bits = Math.max(4, l);
-  const valuesPerLong = Math.floor(64 / bits);
-  const mask = (1n << BigInt(bits)) - 1n;
-  const n = Math.floor(bs.data.byteLength / 8);
-  const view = new DataView(bs.data);
-  const longs = new BigUint64Array(n);
-  for (let k = 0; k < n; k++) longs[k] = view.getBigUint64(k * 8, false); // big-endian
-
-  const idxAt = (lx: number, ly: number, lz: number): number => {
-    const i = ly * 256 + lz * 16 + lx;
-    const j = i % valuesPerLong;
-    const k = (i - j) / valuesPerLong;
-    if (k >= n) return -1;
-    return Number((longs[k] >> BigInt(j * bits)) & mask);
-  };
+  const bits = Math.max(4, paletteBits(entries.length)); // blocks: min 4 bits
+  const read = packedExtractor(bs.data, bits);
+  const idxAt = (lx: number, ly: number, lz: number): number => read(ly * 256 + lz * 16 + lx);
   return { palNames, palDrawable, idxAt };
+}
+
+// ---------------------------------------------------------------------------
+// Biome reader (paletted container, 4x4x4 cells, string palette, no 4-bit min)
+// ---------------------------------------------------------------------------
+
+function biomeContainer(section: TagData[]): { bs?: BlockStates; pal?: TagData } {
+  const c = childTag(section, 'biomes');
+  if (c && Array.isArray(c.data)) {
+    const inner = c.data as TagData[];
+    return {
+      bs: inner.find(x => x.name === 'data') as unknown as BlockStates | undefined,
+      pal: inner.find(x => x.name === 'palette'),
+    };
+  }
+  return {};
+}
+
+type BiomeReader = { biomeAt: (lx: number, ly: number, lz: number) => string | null };
+
+function buildBiomeReader(section: TagData[]): BiomeReader | null {
+  const { bs, pal } = biomeContainer(section);
+  if (!pal) return null;
+  // Biome palette is a LIST of STRING, so data.data is the id array directly.
+  const names = (((pal.data as unknown) as { data?: unknown } | null)?.data as string[]) ?? [];
+  if (names.length === 0) return null;
+  if (names.length === 1 || !bs || !(bs.data instanceof ArrayBuffer) || bs.data.byteLength === 0) {
+    const only = names[0];
+    return { biomeAt: () => only };
+  }
+  const read = packedExtractor(bs.data, paletteBits(names.length)); // biomes: no min
+  return {
+    biomeAt: (lx, ly, lz) => {
+      const idx = read((ly >> 2) * 16 + (lz >> 2) * 4 + (lx >> 2)); // 4x4x4 cells
+      return idx < 0 || idx >= names.length ? null : names[idx];
+    },
+  };
+}
+
+// Sample the biome at each resolved column's surface block. Independent of how
+// names/heights were produced, so it runs once after fast/scan. Returns null
+// per column when the chunk has no per-section biome data (e.g. pre-1.18).
+function sampleBiomes(chunk: Chunk, names: (string | null)[], heights: Int32Array): (string | null)[] {
+  const out: (string | null)[] = new Array(256).fill(null);
+  const sectionTag = chunk.sections();
+  if (!sectionTag) return out;
+
+  const byY = new Map<number, TagData[]>();
+  for (const s of sectionTag.data.data as TagData[][]) {
+    if (childTag(s, 'Y') !== undefined) byY.set(sectionY(s), s);
+  }
+  const readers = new Map<number, BiomeReader | null>();
+  const getReader = (secY: number): BiomeReader | null => {
+    if (readers.has(secY)) return readers.get(secY) ?? null;
+    const s = byY.get(secY);
+    const r = s ? buildBiomeReader(s) : null;
+    readers.set(secY, r);
+    return r;
+  };
+
+  for (let c = 0; c < 256; c++) {
+    if (names[c] === null) continue;
+    const wy = heights[c];
+    if (wy === EMPTY_HEIGHT) continue;
+    const secY = Math.floor(wy / 16);
+    const rdr = getReader(secY);
+    if (!rdr) continue;
+    out[c] = rdr.biomeAt(c % 16, wy - secY * 16, Math.floor(c / 16));
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +311,7 @@ function buildReader(section: TagData[], table: ColorTable): SectionReader | nul
 
 const STEP_LIMIT = 32; // max blocks to step down past air/NONE before giving up
 
-function fastColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
+function fastColumns(chunk: Chunk, table: ColorTable): Columns | null {
   const coords = chunk.getCoordinates();
   if (!coords) return null;
   const [ox, oz] = coords;
@@ -242,7 +385,7 @@ function fastColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
 // Fallback path: top-down section scan (always correct, no heightmap needed)
 // ---------------------------------------------------------------------------
 
-function scanColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
+function scanColumns(chunk: Chunk, table: ColorTable): Columns | null {
   const coords = chunk.getCoordinates();
   if (!coords) return null;
   const [ox, oz] = coords;
@@ -305,14 +448,14 @@ function scanColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
 
 let fastVerified: boolean | null = null; // null = not yet checked (per worker)
 
-function columnsEqual(a: ChunkColumns, b: ChunkColumns): boolean {
+function columnsEqual(a: Columns, b: Columns): boolean {
   for (let i = 0; i < 256; i++) {
     if (a.names[i] !== b.names[i] || a.heights[i] !== b.heights[i]) return false;
   }
   return true;
 }
 
-export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
+function resolveColumns(chunk: Chunk, table: ColorTable): Columns | null {
   if (fastVerified === false) return scanColumns(chunk, table);
 
   const fast = fastColumns(chunk, table);
@@ -327,4 +470,12 @@ export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null
     return scan ?? fast;
   }
   return fast;
+}
+
+// Public entry: resolve surface columns, then sample biomes for each.
+export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
+  const cols = resolveColumns(chunk, table);
+  if (!cols) return null;
+  const biomes = sampleBiomes(chunk, cols.names, cols.heights);
+  return { ...cols, biomes };
 }
