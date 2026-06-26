@@ -10977,6 +10977,303 @@
       1971474
     ]
   },
+  "minecraft:sulfur": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:potent_sulfur": {
+    "mapColorId": 30,
+    "baseRGB": 16445005,
+    "baseHex": "#FAEE4D",
+    "shades": [
+      11577398,
+      14142786,
+      16445005,
+      8683048
+    ]
+  },
+  "minecraft:sulfur_slab": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:sulfur_stairs": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:sulfur_wall": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:polished_sulfur": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:polished_sulfur_slab": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:polished_sulfur_stairs": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:polished_sulfur_wall": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:sulfur_bricks": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:sulfur_brick_slab": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:sulfur_brick_stairs": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:sulfur_brick_wall": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:chiseled_sulfur": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
+    "shades": [
+      10592548,
+      12961068,
+      15066419,
+      7960859
+    ]
+  },
+  "minecraft:cinnabar": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:cinnabar_slab": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:cinnabar_stairs": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:cinnabar_wall": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:polished_cinnabar": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:polished_cinnabar_slab": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:polished_cinnabar_stairs": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:polished_cinnabar_wall": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:cinnabar_bricks": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:cinnabar_brick_slab": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:cinnabar_brick_stairs": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:cinnabar_brick_wall": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
+  "minecraft:chiseled_cinnabar": {
+    "mapColorId": 28,
+    "baseRGB": 10040115,
+    "baseHex": "#993333",
+    "shades": [
+      7087140,
+      8662060,
+      10040115,
+      5315355
+    ]
+  },
   "minecraft:calcite": {
     "mapColorId": 36,
     "baseRGB": 13742497,
@@ -11120,6 +11417,50 @@
       737862
     ]
   },
+  "minecraft:waxed_copper_block": {
+    "mapColorId": 15,
+    "baseRGB": 14188339,
+    "baseHex": "#D87F33",
+    "shades": [
+      9984292,
+      12217644,
+      14188339,
+      7488283
+    ]
+  },
+  "minecraft:waxed_exposed_copper": {
+    "mapColorId": 44,
+    "baseRGB": 8874850,
+    "baseHex": "#876B62",
+    "shades": [
+      6245189,
+      7625812,
+      8874850,
+      4667443
+    ]
+  },
+  "minecraft:waxed_weathered_copper": {
+    "mapColorId": 56,
+    "baseRGB": 3837580,
+    "baseHex": "#3A8E8C",
+    "shades": [
+      2647138,
+      3308152,
+      3837580,
+      1985354
+    ]
+  },
+  "minecraft:waxed_oxidized_copper": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
+    ]
+  },
   "minecraft:copper_ore": {
     "mapColorId": 11,
     "baseRGB": 7368816,
@@ -11142,26 +11483,15 @@
       3421236
     ]
   },
-  "minecraft:oxidized_cut_copper": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
+  "minecraft:cut_copper": {
+    "mapColorId": 15,
+    "baseRGB": 14188339,
+    "baseHex": "#D87F33",
     "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
-  "minecraft:weathered_cut_copper": {
-    "mapColorId": 56,
-    "baseRGB": 3837580,
-    "baseHex": "#3A8E8C",
-    "shades": [
-      2647138,
-      3308152,
-      3837580,
-      1985354
+      9984292,
+      12217644,
+      14188339,
+      7488283
     ]
   },
   "minecraft:exposed_cut_copper": {
@@ -11175,29 +11505,7 @@
       4667443
     ]
   },
-  "minecraft:cut_copper": {
-    "mapColorId": 15,
-    "baseRGB": 14188339,
-    "baseHex": "#D87F33",
-    "shades": [
-      9984292,
-      12217644,
-      14188339,
-      7488283
-    ]
-  },
-  "minecraft:oxidized_chiseled_copper": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
-  "minecraft:weathered_chiseled_copper": {
+  "minecraft:weathered_cut_copper": {
     "mapColorId": 56,
     "baseRGB": 3837580,
     "baseHex": "#3A8E8C",
@@ -11208,29 +11516,7 @@
       1985354
     ]
   },
-  "minecraft:exposed_chiseled_copper": {
-    "mapColorId": 44,
-    "baseRGB": 8874850,
-    "baseHex": "#876B62",
-    "shades": [
-      6245189,
-      7625812,
-      8874850,
-      4667443
-    ]
-  },
-  "minecraft:chiseled_copper": {
-    "mapColorId": 15,
-    "baseRGB": 14188339,
-    "baseHex": "#D87F33",
-    "shades": [
-      9984292,
-      12217644,
-      14188339,
-      7488283
-    ]
-  },
-  "minecraft:waxed_oxidized_chiseled_copper": {
+  "minecraft:oxidized_cut_copper": {
     "mapColorId": 55,
     "baseRGB": 1474182,
     "baseHex": "#167E86",
@@ -11239,204 +11525,6 @@
       1207411,
       1474182,
       737862
-    ]
-  },
-  "minecraft:waxed_weathered_chiseled_copper": {
-    "mapColorId": 56,
-    "baseRGB": 3837580,
-    "baseHex": "#3A8E8C",
-    "shades": [
-      2647138,
-      3308152,
-      3837580,
-      1985354
-    ]
-  },
-  "minecraft:waxed_exposed_chiseled_copper": {
-    "mapColorId": 44,
-    "baseRGB": 8874850,
-    "baseHex": "#876B62",
-    "shades": [
-      6245189,
-      7625812,
-      8874850,
-      4667443
-    ]
-  },
-  "minecraft:waxed_chiseled_copper": {
-    "mapColorId": 15,
-    "baseRGB": 14188339,
-    "baseHex": "#D87F33",
-    "shades": [
-      9984292,
-      12217644,
-      14188339,
-      7488283
-    ]
-  },
-  "minecraft:oxidized_cut_copper_stairs": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
-  "minecraft:weathered_cut_copper_stairs": {
-    "mapColorId": 56,
-    "baseRGB": 3837580,
-    "baseHex": "#3A8E8C",
-    "shades": [
-      2647138,
-      3308152,
-      3837580,
-      1985354
-    ]
-  },
-  "minecraft:exposed_cut_copper_stairs": {
-    "mapColorId": 44,
-    "baseRGB": 8874850,
-    "baseHex": "#876B62",
-    "shades": [
-      6245189,
-      7625812,
-      8874850,
-      4667443
-    ]
-  },
-  "minecraft:cut_copper_stairs": {
-    "mapColorId": 15,
-    "baseRGB": 14188339,
-    "baseHex": "#D87F33",
-    "shades": [
-      9984292,
-      12217644,
-      14188339,
-      7488283
-    ]
-  },
-  "minecraft:oxidized_cut_copper_slab": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
-  "minecraft:weathered_cut_copper_slab": {
-    "mapColorId": 56,
-    "baseRGB": 3837580,
-    "baseHex": "#3A8E8C",
-    "shades": [
-      2647138,
-      3308152,
-      3837580,
-      1985354
-    ]
-  },
-  "minecraft:exposed_cut_copper_slab": {
-    "mapColorId": 44,
-    "baseRGB": 8874850,
-    "baseHex": "#876B62",
-    "shades": [
-      6245189,
-      7625812,
-      8874850,
-      4667443
-    ]
-  },
-  "minecraft:cut_copper_slab": {
-    "mapColorId": 15,
-    "baseRGB": 14188339,
-    "baseHex": "#D87F33",
-    "shades": [
-      9984292,
-      12217644,
-      14188339,
-      7488283
-    ]
-  },
-  "minecraft:waxed_copper_block": {
-    "mapColorId": 15,
-    "baseRGB": 14188339,
-    "baseHex": "#D87F33",
-    "shades": [
-      9984292,
-      12217644,
-      14188339,
-      7488283
-    ]
-  },
-  "minecraft:waxed_weathered_copper": {
-    "mapColorId": 56,
-    "baseRGB": 3837580,
-    "baseHex": "#3A8E8C",
-    "shades": [
-      2647138,
-      3308152,
-      3837580,
-      1985354
-    ]
-  },
-  "minecraft:waxed_exposed_copper": {
-    "mapColorId": 44,
-    "baseRGB": 8874850,
-    "baseHex": "#876B62",
-    "shades": [
-      6245189,
-      7625812,
-      8874850,
-      4667443
-    ]
-  },
-  "minecraft:waxed_oxidized_copper": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
-  "minecraft:waxed_oxidized_cut_copper": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
-  "minecraft:waxed_weathered_cut_copper": {
-    "mapColorId": 56,
-    "baseRGB": 3837580,
-    "baseHex": "#3A8E8C",
-    "shades": [
-      2647138,
-      3308152,
-      3837580,
-      1985354
-    ]
-  },
-  "minecraft:waxed_exposed_cut_copper": {
-    "mapColorId": 44,
-    "baseRGB": 8874850,
-    "baseHex": "#876B62",
-    "shades": [
-      6245189,
-      7625812,
-      8874850,
-      4667443
     ]
   },
   "minecraft:waxed_cut_copper": {
@@ -11450,18 +11538,18 @@
       7488283
     ]
   },
-  "minecraft:waxed_oxidized_cut_copper_stairs": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
+  "minecraft:waxed_exposed_cut_copper": {
+    "mapColorId": 44,
+    "baseRGB": 8874850,
+    "baseHex": "#876B62",
     "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
+      6245189,
+      7625812,
+      8874850,
+      4667443
     ]
   },
-  "minecraft:waxed_weathered_cut_copper_stairs": {
+  "minecraft:waxed_weathered_cut_copper": {
     "mapColorId": 56,
     "baseRGB": 3837580,
     "baseHex": "#3A8E8C",
@@ -11472,7 +11560,29 @@
       1985354
     ]
   },
-  "minecraft:waxed_exposed_cut_copper_stairs": {
+  "minecraft:waxed_oxidized_cut_copper": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
+    ]
+  },
+  "minecraft:chiseled_copper": {
+    "mapColorId": 15,
+    "baseRGB": 14188339,
+    "baseHex": "#D87F33",
+    "shades": [
+      9984292,
+      12217644,
+      14188339,
+      7488283
+    ]
+  },
+  "minecraft:exposed_chiseled_copper": {
     "mapColorId": 44,
     "baseRGB": 8874850,
     "baseHex": "#876B62",
@@ -11481,6 +11591,116 @@
       7625812,
       8874850,
       4667443
+    ]
+  },
+  "minecraft:weathered_chiseled_copper": {
+    "mapColorId": 56,
+    "baseRGB": 3837580,
+    "baseHex": "#3A8E8C",
+    "shades": [
+      2647138,
+      3308152,
+      3837580,
+      1985354
+    ]
+  },
+  "minecraft:oxidized_chiseled_copper": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
+    ]
+  },
+  "minecraft:waxed_chiseled_copper": {
+    "mapColorId": 15,
+    "baseRGB": 14188339,
+    "baseHex": "#D87F33",
+    "shades": [
+      9984292,
+      12217644,
+      14188339,
+      7488283
+    ]
+  },
+  "minecraft:waxed_exposed_chiseled_copper": {
+    "mapColorId": 44,
+    "baseRGB": 8874850,
+    "baseHex": "#876B62",
+    "shades": [
+      6245189,
+      7625812,
+      8874850,
+      4667443
+    ]
+  },
+  "minecraft:waxed_weathered_chiseled_copper": {
+    "mapColorId": 56,
+    "baseRGB": 3837580,
+    "baseHex": "#3A8E8C",
+    "shades": [
+      2647138,
+      3308152,
+      3837580,
+      1985354
+    ]
+  },
+  "minecraft:waxed_oxidized_chiseled_copper": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
+    ]
+  },
+  "minecraft:cut_copper_stairs": {
+    "mapColorId": 15,
+    "baseRGB": 14188339,
+    "baseHex": "#D87F33",
+    "shades": [
+      9984292,
+      12217644,
+      14188339,
+      7488283
+    ]
+  },
+  "minecraft:exposed_cut_copper_stairs": {
+    "mapColorId": 44,
+    "baseRGB": 8874850,
+    "baseHex": "#876B62",
+    "shades": [
+      6245189,
+      7625812,
+      8874850,
+      4667443
+    ]
+  },
+  "minecraft:weathered_cut_copper_stairs": {
+    "mapColorId": 56,
+    "baseRGB": 3837580,
+    "baseHex": "#3A8E8C",
+    "shades": [
+      2647138,
+      3308152,
+      3837580,
+      1985354
+    ]
+  },
+  "minecraft:oxidized_cut_copper_stairs": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
     ]
   },
   "minecraft:waxed_cut_copper_stairs": {
@@ -11494,7 +11714,29 @@
       7488283
     ]
   },
-  "minecraft:waxed_oxidized_cut_copper_slab": {
+  "minecraft:waxed_exposed_cut_copper_stairs": {
+    "mapColorId": 44,
+    "baseRGB": 8874850,
+    "baseHex": "#876B62",
+    "shades": [
+      6245189,
+      7625812,
+      8874850,
+      4667443
+    ]
+  },
+  "minecraft:waxed_weathered_cut_copper_stairs": {
+    "mapColorId": 56,
+    "baseRGB": 3837580,
+    "baseHex": "#3A8E8C",
+    "shades": [
+      2647138,
+      3308152,
+      3837580,
+      1985354
+    ]
+  },
+  "minecraft:waxed_oxidized_cut_copper_stairs": {
     "mapColorId": 55,
     "baseRGB": 1474182,
     "baseHex": "#167E86",
@@ -11505,7 +11747,29 @@
       737862
     ]
   },
-  "minecraft:waxed_weathered_cut_copper_slab": {
+  "minecraft:cut_copper_slab": {
+    "mapColorId": 15,
+    "baseRGB": 14188339,
+    "baseHex": "#D87F33",
+    "shades": [
+      9984292,
+      12217644,
+      14188339,
+      7488283
+    ]
+  },
+  "minecraft:exposed_cut_copper_slab": {
+    "mapColorId": 44,
+    "baseRGB": 8874850,
+    "baseHex": "#876B62",
+    "shades": [
+      6245189,
+      7625812,
+      8874850,
+      4667443
+    ]
+  },
+  "minecraft:weathered_cut_copper_slab": {
     "mapColorId": 56,
     "baseRGB": 3837580,
     "baseHex": "#3A8E8C",
@@ -11514,6 +11778,28 @@
       3308152,
       3837580,
       1985354
+    ]
+  },
+  "minecraft:oxidized_cut_copper_slab": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
+    ]
+  },
+  "minecraft:waxed_cut_copper_slab": {
+    "mapColorId": 15,
+    "baseRGB": 14188339,
+    "baseHex": "#D87F33",
+    "shades": [
+      9984292,
+      12217644,
+      14188339,
+      7488283
     ]
   },
   "minecraft:waxed_exposed_cut_copper_slab": {
@@ -11527,15 +11813,26 @@
       4667443
     ]
   },
-  "minecraft:waxed_cut_copper_slab": {
-    "mapColorId": 15,
-    "baseRGB": 14188339,
-    "baseHex": "#D87F33",
+  "minecraft:waxed_weathered_cut_copper_slab": {
+    "mapColorId": 56,
+    "baseRGB": 3837580,
+    "baseHex": "#3A8E8C",
     "shades": [
-      9984292,
-      12217644,
-      14188339,
-      7488283
+      2647138,
+      3308152,
+      3837580,
+      1985354
+    ]
+  },
+  "minecraft:waxed_oxidized_cut_copper_slab": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
     ]
   },
   "minecraft:copper_door": {
@@ -11560,17 +11857,6 @@
       4667443
     ]
   },
-  "minecraft:oxidized_copper_door": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
   "minecraft:weathered_copper_door": {
     "mapColorId": 56,
     "baseRGB": 3837580,
@@ -11580,6 +11866,17 @@
       3308152,
       3837580,
       1985354
+    ]
+  },
+  "minecraft:oxidized_copper_door": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
     ]
   },
   "minecraft:waxed_copper_door": {
@@ -11604,17 +11901,6 @@
       4667443
     ]
   },
-  "minecraft:waxed_oxidized_copper_door": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
   "minecraft:waxed_weathered_copper_door": {
     "mapColorId": 56,
     "baseRGB": 3837580,
@@ -11624,6 +11910,17 @@
       3308152,
       3837580,
       1985354
+    ]
+  },
+  "minecraft:waxed_oxidized_copper_door": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
     ]
   },
   "minecraft:copper_trapdoor": {
@@ -11648,17 +11945,6 @@
       4667443
     ]
   },
-  "minecraft:oxidized_copper_trapdoor": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
   "minecraft:weathered_copper_trapdoor": {
     "mapColorId": 56,
     "baseRGB": 3837580,
@@ -11668,6 +11954,17 @@
       3308152,
       3837580,
       1985354
+    ]
+  },
+  "minecraft:oxidized_copper_trapdoor": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
     ]
   },
   "minecraft:waxed_copper_trapdoor": {
@@ -11692,17 +11989,6 @@
       4667443
     ]
   },
-  "minecraft:waxed_oxidized_copper_trapdoor": {
-    "mapColorId": 55,
-    "baseRGB": 1474182,
-    "baseHex": "#167E86",
-    "shades": [
-      1005662,
-      1207411,
-      1474182,
-      737862
-    ]
-  },
   "minecraft:waxed_weathered_copper_trapdoor": {
     "mapColorId": 56,
     "baseRGB": 3837580,
@@ -11712,6 +11998,17 @@
       3308152,
       3837580,
       1985354
+    ]
+  },
+  "minecraft:waxed_oxidized_copper_trapdoor": {
+    "mapColorId": 55,
+    "baseRGB": 1474182,
+    "baseHex": "#167E86",
+    "shades": [
+      1005662,
+      1207411,
+      1474182,
+      737862
     ]
   },
   "minecraft:copper_grate": {
@@ -12154,6 +12451,17 @@
       737862
     ]
   },
+  "minecraft:dripstone_block": {
+    "mapColorId": 48,
+    "baseRGB": 4993571,
+    "baseHex": "#4C3223",
+    "shades": [
+      3482392,
+      4270878,
+      4993571,
+      2628114
+    ]
+  },
   "minecraft:pointed_dripstone": {
     "mapColorId": 48,
     "baseRGB": 4993571,
@@ -12165,15 +12473,15 @@
       2628114
     ]
   },
-  "minecraft:dripstone_block": {
-    "mapColorId": 48,
-    "baseRGB": 4993571,
-    "baseHex": "#4C3223",
+  "minecraft:sulfur_spike": {
+    "mapColorId": 18,
+    "baseRGB": 15066419,
+    "baseHex": "#E5E533",
     "shades": [
-      3482392,
-      4270878,
-      4993571,
-      2628114
+      10592548,
+      12961068,
+      15066419,
+      7960859
     ]
   },
   "minecraft:cave_vines": {

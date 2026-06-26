@@ -741,6 +741,20 @@
       "hex": "#3F76E4"
     }
   },
+  "minecraft:sulfur_caves": {
+    "grass": {
+      "RGB": 11249231,
+      "hex": "#ABA64F"
+    },
+    "foliage": {
+      "RGB": 7842607,
+      "hex": "#77AB2F"
+    },
+    "water": {
+      "RGB": 3456905,
+      "hex": "#34BF89"
+    }
+  },
   "minecraft:sunflower_plains": {
     "grass": {
       "RGB": 9551193,
