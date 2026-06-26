@@ -178,6 +178,7 @@ type Columns = {
 
 export type ChunkColumns = Columns & {
   biomes: (string | null)[]; // [z*16 + x], biome id at that surface block, or null
+  depths: Int32Array; // [z*16 + x], water depth in blocks at the surface (0 = not water)
 };
 
 // Big-endian long extractor shared by the block and biome readers. Reads value
@@ -272,24 +273,46 @@ function buildBiomeReader(section: TagData[]): BiomeReader | null {
   };
 }
 
-// Sample the biome at each resolved column's surface block. Independent of how
-// names/heights were produced, so it runs once after fast/scan. Returns null
-// per column when the chunk has no per-section biome data (e.g. pre-1.18).
-function sampleBiomes(chunk: Chunk, names: (string | null)[], heights: Int32Array): (string | null)[] {
-  const out: (string | null)[] = new Array(256).fill(null);
+const WATER = 'minecraft:water';
+const WATER_DEPTH_CAP = 48; // bound the downward scan for very deep oceans
+
+// Sample, per resolved column: the surface biome, and (for water) the water
+// depth used for shading. Independent of fast/scan, so it runs once after.
+function sampleExtras(
+  chunk: Chunk,
+  table: ColorTable,
+  names: (string | null)[],
+  heights: Int32Array,
+): { biomes: (string | null)[]; depths: Int32Array } {
+  const biomes: (string | null)[] = new Array(256).fill(null);
+  const depths = new Int32Array(256);
   const sectionTag = chunk.sections();
-  if (!sectionTag) return out;
+  if (!sectionTag) return { biomes, depths };
 
   const byY = new Map<number, TagData[]>();
+  let minSecY = Infinity;
   for (const s of sectionTag.data.data as TagData[][]) {
-    if (childTag(s, 'Y') !== undefined) byY.set(sectionY(s), s);
+    if (childTag(s, 'Y') === undefined) continue;
+    const y = sectionY(s);
+    byY.set(y, s);
+    if (y < minSecY) minSecY = y;
   }
-  const readers = new Map<number, BiomeReader | null>();
-  const getReader = (secY: number): BiomeReader | null => {
-    if (readers.has(secY)) return readers.get(secY) ?? null;
+  const minY = isFinite(minSecY) ? minSecY * 16 : 0;
+
+  const biomeReaders = new Map<number, BiomeReader | null>();
+  const getBiome = (secY: number): BiomeReader | null => {
+    if (biomeReaders.has(secY)) return biomeReaders.get(secY) ?? null;
     const s = byY.get(secY);
     const r = s ? buildBiomeReader(s) : null;
-    readers.set(secY, r);
+    biomeReaders.set(secY, r);
+    return r;
+  };
+  const blockReaders = new Map<number, SectionReader | null>();
+  const getBlock = (secY: number): SectionReader | null => {
+    if (blockReaders.has(secY)) return blockReaders.get(secY) ?? null;
+    const s = byY.get(secY);
+    const r = s ? buildReader(s, table) : null;
+    blockReaders.set(secY, r);
     return r;
   };
 
@@ -297,12 +320,28 @@ function sampleBiomes(chunk: Chunk, names: (string | null)[], heights: Int32Arra
     if (names[c] === null) continue;
     const wy = heights[c];
     if (wy === EMPTY_HEIGHT) continue;
+    const lx = c % 16;
+    const lz = Math.floor(c / 16);
+
     const secY = Math.floor(wy / 16);
-    const rdr = getReader(secY);
-    if (!rdr) continue;
-    out[c] = rdr.biomeAt(c % 16, wy - secY * 16, Math.floor(c / 16));
+    const br = getBiome(secY);
+    if (br) biomes[c] = br.biomeAt(lx, wy - secY * 16, lz);
+
+    // Water depth: number of water blocks downward from the surface.
+    if (names[c] === WATER) {
+      let depth = 0;
+      for (let y = wy; y >= minY && depth < WATER_DEPTH_CAP; y--) {
+        const sy = Math.floor(y / 16);
+        const rdr = getBlock(sy);
+        if (!rdr) break;
+        const idx = rdr.idxAt(lx, y - sy * 16, lz);
+        if (idx < 0 || rdr.palNames[idx] !== WATER) break;
+        depth++;
+      }
+      depths[c] = depth;
+    }
   }
-  return out;
+  return { biomes, depths };
 }
 
 // ---------------------------------------------------------------------------
@@ -472,10 +511,10 @@ function resolveColumns(chunk: Chunk, table: ColorTable): Columns | null {
   return fast;
 }
 
-// Public entry: resolve surface columns, then sample biomes for each.
+// Public entry: resolve surface columns, then sample biomes + water depth.
 export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
   const cols = resolveColumns(chunk, table);
   if (!cols) return null;
-  const biomes = sampleBiomes(chunk, cols.names, cols.heights);
-  return { ...cols, biomes };
+  const { biomes, depths } = sampleExtras(chunk, table, cols.names, cols.heights);
+  return { ...cols, biomes, depths };
 }

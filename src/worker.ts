@@ -17,11 +17,14 @@ const { file, rx, rz } = workerData as Job;
 // Loaded once per worker. Override paths with MAP_COLORS_PATH / BIOME_COLORS_PATH.
 const table = loadColorTable(process.env.MAP_COLORS_PATH);
 const biomeColors = loadBiomeColors(process.env.BIOME_COLORS_PATH);
+// Overall darkening (1 = none). Water also gets depth-based shading below.
+const BRIGHTNESS = process.env.MAP_BRIGHTNESS !== undefined ? Number(process.env.MAP_BRIGHTNESS) : 0.9;
 
 const baseX = rx * SIZE;
 const baseZ = rz * SIZE;
 const name: (string | null)[] = new Array(SIZE * SIZE).fill(null);
 const biome: (string | null)[] = new Array(SIZE * SIZE).fill(null);
+const depth = new Int32Array(SIZE * SIZE);
 const height = new Int32Array(SIZE * SIZE).fill(EMPTY_HEIGHT);
 let any = false;
 
@@ -44,6 +47,7 @@ for (const chunk of chunks) {
       const idx = lz * SIZE + lx;
       name[idx] = nm;
       biome[idx] = cols.biomes[cc];
+      depth[idx] = cols.depths[cc];
       height[idx] = cols.heights[cc];
       any = true;
     }
@@ -77,6 +81,12 @@ async function run(): Promise<void> {
         // everything else uses its map color. Falls back to the map color when
         // there's no biome data or the color is unresolved (-1).
         const tint = TINTS[nm];
+        // Water is shaded by depth (shallow bright -> deep dark), with a 1px
+        // checkerboard dither, like the vanilla map. Overrides the height shade.
+        if (tint === 'water') {
+          const d0 = depth[idx] * 0.1 + ((lx + lz) & 1) * 0.2;
+          shadeIndex = d0 < 0.5 ? 2 : d0 > 0.9 ? 0 : 1;
+        }
         let r: number, g: number, b: number;
         if (tint === undefined) {
           [r, g, b] = colorRGB(table, nm, shadeIndex);
@@ -92,9 +102,9 @@ async function run(): Promise<void> {
           [r, g, b] = base >= 0 ? shadeRGB(base, shadeIndex) : colorRGB(table, nm, shadeIndex);
         }
         const p = idx * 4;
-        rgba[p] = r;
-        rgba[p + 1] = g;
-        rgba[p + 2] = b;
+        rgba[p] = Math.min(255, Math.round(r * BRIGHTNESS));
+        rgba[p + 1] = Math.min(255, Math.round(g * BRIGHTNESS));
+        rgba[p + 2] = Math.min(255, Math.round(b * BRIGHTNESS));
         rgba[p + 3] = 255;
       }
     }
