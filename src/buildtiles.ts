@@ -15,6 +15,13 @@ const TILE = 512; // Leaflet tileSize; one base tile == one region
 const MANIFEST = 'render-manifest.json';
 const MANIFEST_VERSION = 1;
 
+// Minecraft version this renderer was written for. The bundled map_colors.json /
+// biome_colors.json and the TINTS table in chunkmap.ts were generated against
+// it; if a world reports a different DataVersion the colors may be stale and
+// should be regenerated with the map-color-dump mod for that version.
+const TARGET_VERSION = '26.1.2';
+const TARGET_DATA_VERSION = 4790;
+
 // --- region folder resolution (modern layout + legacy fallback) -------------
 function regionDir(worldPath: string, dimension: string): string {
   const [ns, p] = (dimension.includes(':')
@@ -80,25 +87,41 @@ function reusable(m: Manifest | null, dimension: string, regions: RegionFile[]):
   return true;
 }
 
-// --- spawn from level.dat ---------------------------------------------------
-function readSpawn(worldPath: string): { x: number; z: number } | null {
+// --- spawn + version from level.dat -----------------------------------------
+type WorldVersion = { name: string | null; dataVersion: number | null };
+
+function readLevel(worldPath: string): {
+  spawn: { x: number; z: number } | null;
+  version: WorldVersion | null;
+} {
   const f = join(worldPath, 'level.dat');
-  if (!existsSync(f)) return null;
+  if (!existsSync(f)) return { spawn: null, version: null };
   try {
     const buf = readFileSync(f);
     const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     const root = new NBTParser(ab).getTag() as TagData; // NBTParser auto-gunzips
 
+    let spawn: { x: number; z: number } | null = null;
     const pos = findChildTagAtPath('Data/spawn/pos', root);
     if (pos && Array.isArray(pos.data) && pos.data.length >= 3) {
-      return { x: Number(pos.data[0]), z: Number(pos.data[2]) };
+      spawn = { x: Number(pos.data[0]), z: Number(pos.data[2]) };
+    } else {
+      const sx = findChildTagAtPath('Data/SpawnX', root);
+      const sz = findChildTagAtPath('Data/SpawnZ', root);
+      if (sx && sz) spawn = { x: Number(sx.data), z: Number(sz.data) };
     }
-    const sx = findChildTagAtPath('Data/SpawnX', root);
-    const sz = findChildTagAtPath('Data/SpawnZ', root);
-    if (sx && sz) return { x: Number(sx.data), z: Number(sz.data) };
-    return null;
+
+    const nameT = findChildTagAtPath('Data/Version/Name', root);
+    const dvT = findChildTagAtPath('Data/DataVersion', root);
+    const name = nameT && typeof nameT.data === 'string' ? nameT.data : null;
+    const dataVersion = dvT && (typeof dvT.data === 'number' || typeof dvT.data === 'bigint')
+      ? Number(dvT.data)
+      : null;
+    const version = name !== null || dataVersion !== null ? { name, dataVersion } : null;
+
+    return { spawn, version };
   } catch {
-    return null;
+    return { spawn: null, version: null };
   }
 }
 
@@ -189,7 +212,15 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const spawn = readSpawn(worldPath);
+  const { spawn, version } = readLevel(worldPath);
+  if (version && version.dataVersion !== null && version.dataVersion !== TARGET_DATA_VERSION) {
+    console.error(
+      `WARNING: world reports Minecraft ${version.name ?? '?'} (DataVersion ${version.dataVersion}), ` +
+      `but this renderer was built for ${TARGET_VERSION} (DataVersion ${TARGET_DATA_VERSION}). ` +
+      `The bundled map_colors.json / biome_colors.json may be out of date — regenerate them with ` +
+      `the map-color-dump mod for this version.`,
+    );
+  }
   const minRx = Math.min(...regions.map(r => r.rx));
   const maxRx = Math.max(...regions.map(r => r.rx));
   const minRz = Math.min(...regions.map(r => r.rz));
@@ -293,7 +324,16 @@ async function main(): Promise<void> {
   };
   writeFileSync(join(outDir, MANIFEST), JSON.stringify(manifestOut));
 
-  const meta: MapMeta = { maxZoom: MAXZOOM, minX: originRx * TILE, minZ: originRz * TILE, tileSize: TILE, spawn, dimension };
+  const meta: MapMeta = {
+    maxZoom: MAXZOOM,
+    minX: originRx * TILE,
+    minZ: originRz * TILE,
+    tileSize: TILE,
+    spawn,
+    dimension,
+    version,
+    targetVersion: { name: TARGET_VERSION, dataVersion: TARGET_DATA_VERSION },
+  };
   writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 2));
   writeViewer(outDir, meta);
   console.error(`done (${incr ? 'incremental' : 'full'}). serve ${outDir}/ over HTTP and open index.html`);

@@ -10,6 +10,11 @@ export type MapMeta = {
   tileSize: number; // Leaflet tileSize (px); one base tile == one region (512)
   spawn: { x: number; z: number } | null;
   dimension?: string;
+  // Minecraft version the world reports (from level.dat), and the version this
+  // renderer's block list / color tables were built for. A mismatch means the
+  // colors may be stale.
+  version?: { name: string | null; dataVersion: number | null } | null;
+  targetVersion?: { name: string; dataVersion: number };
 };
 
 export function indexHtml(meta: MapMeta): string {
