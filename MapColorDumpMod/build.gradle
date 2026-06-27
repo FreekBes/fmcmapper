@@ -16,9 +16,9 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    // NOTE: no `mappings` line. For 26.x loom uses its default mapping set.
-    // Do NOT add loom.officialMojangMappings() — Mojang doesn't publish
-    // mappings for 26.x, which causes "Failed to find official mojang mappings".
+    // NOTE: no `mappings` line. Since 26.1 Minecraft ships unobfuscated, so the
+    // jar already carries real class/method names and loom does not remap.
+    // Do NOT add loom.officialMojangMappings() — there are no mappings to apply.
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
