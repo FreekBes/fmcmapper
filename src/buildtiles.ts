@@ -195,10 +195,18 @@ async function buildParent(root: string, z: number, x: number, y: number): Promi
 
 // --- main -------------------------------------------------------------------
 async function main(): Promise<void> {
-  const [worldPath, dimension = 'minecraft:overworld', outDir = 'tiles_out'] =
-    process.argv.slice(2);
+  // Inputs come from positional args, falling back to env vars. Args take
+  // precedence so a CLI invocation can override the environment.
+  const [argWorld, argDimension, argOut] = process.argv.slice(2);
+  const worldPath = argWorld ?? process.env.WORLD_PATH ?? './world';
+  const dimension = argDimension ?? process.env.DIMENSION ?? 'minecraft:overworld';
+  const outDir = argOut ?? process.env.OUTPUT_PATH ?? './output';
   if (!worldPath) {
-    console.error('usage: node buildtiles.js <worldPath> [dimension] [outDir]');
+    console.error(
+      'usage: node buildtiles.js <worldPath> [dimension] [outDir]\n' +
+      '   or: WORLD_PATH=... [DIMENSION=...] [OUTPUT_PATH=...] node buildtiles.js\n' +
+      'other env vars: TILER_JOBS (worker count), TILER_FULL=1 (force full rebuild)',
+    );
     process.exit(1);
   }
 

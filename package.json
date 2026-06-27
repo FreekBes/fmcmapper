@@ -5,9 +5,10 @@
   "license": "ISC",
   "author": "Freek Bes",
   "type": "commonjs",
-  "main": "build/main.js",
+  "main": "build/buildtiles.js",
   "scripts": {
-    "start": "node build/main.js",
+    "start": "node build/buildtiles.js",
+    "viewer": "node build/viewer.js",
     "build": "tsc"
   },
   "dependencies": {

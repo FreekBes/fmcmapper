@@ -102,9 +102,11 @@ export function writeViewer(outDir: string, meta?: MapMeta): void {
 }
 
 // Standalone CLI: regenerate index.html from an existing tile build's meta.json.
-//   node dist/viewer.js [outDir]
+//   node build/viewer.js [outDir]   (or OUTPUT_PATH=... node build/viewer.js)
+// outDir comes from the positional arg, falling back to env, then a default —
+// matching buildtiles.js so both tools take the same inputs.
 if (require.main === module) {
-  const [outDir = 'tiles_out'] = process.argv.slice(2);
+  const outDir = process.argv[2] ?? process.env.OUTPUT_PATH ?? './output';
   writeViewer(outDir);
   console.error(`wrote ${join(outDir, 'index.html')} from ${join(outDir, 'meta.json')}`);
 }
