@@ -42,15 +42,9 @@ function hashBase(name: string): number {
 
 export function colorRGB(table: ColorTable, name: string, shadeIndex: number): [number, number, number] {
   const e = table.get(name);
-  let packed: number;
-  if (e) {
-    packed = e.shades[shadeIndex] ?? e.shades[1];
-  } else {
-    const base = hashBase(name);
-    const mul = FALLBACK_MUL[shadeIndex] ?? 220;
-    const sh = (c: number) => Math.floor((c * mul) / 255) & 0xff;
-    packed = (sh((base >> 16) & 0xff) << 16) | (sh((base >> 8) & 0xff) << 8) | sh(base & 0xff);
-  }
+  // Unknown / modded block: shade a stable hashed base colour the same way.
+  if (!e) return shadeRGB(hashBase(name), shadeIndex);
+  const packed = e.shades[shadeIndex] ?? e.shades[1];
   return [(packed >> 16) & 0xff, (packed >> 8) & 0xff, packed & 0xff];
 }
 
@@ -281,6 +275,40 @@ function buildBiomeReader(section: TagData[]): BiomeReader | null {
   };
 }
 
+// Index a chunk's sections by their (signed) section Y, tracking the min/max
+// present. Returns null when the chunk has no sections at all.
+function indexSections(chunk: Chunk): { byY: Map<number, TagData[]>; minSecY: number; maxSecY: number } | null {
+  const sectionTag = chunk.sections();
+  if (!sectionTag) return null;
+  const byY = new Map<number, TagData[]>();
+  let minSecY = Infinity;
+  let maxSecY = -Infinity;
+  for (const s of sectionTag.data.data as TagData[][]) {
+    if (childTag(s, 'Y') === undefined) continue;
+    const y = sectionY(s);
+    byY.set(y, s);
+    if (y < minSecY) minSecY = y;
+    if (y > maxSecY) maxSecY = y;
+  }
+  if (!isFinite(minSecY)) return null;
+  return { byY, minSecY, maxSecY };
+}
+
+// Lazily build + cache a per-section reader keyed by section Y.
+function memoSection<T>(
+  byY: Map<number, TagData[]>,
+  build: (section: TagData[]) => T | null,
+): (secY: number) => T | null {
+  const cache = new Map<number, T | null>();
+  return (secY: number): T | null => {
+    if (cache.has(secY)) return cache.get(secY) ?? null;
+    const s = byY.get(secY);
+    const r = s ? build(s) : null;
+    cache.set(secY, r);
+    return r;
+  };
+}
+
 const WATER = 'minecraft:water';
 const WATER_DEPTH_CAP = 48; // bound the downward scan for very deep oceans
 
@@ -294,35 +322,13 @@ function sampleExtras(
 ): { biomes: (string | null)[]; depths: Int32Array } {
   const biomes: (string | null)[] = new Array(256).fill(null);
   const depths = new Int32Array(256);
-  const sectionTag = chunk.sections();
-  if (!sectionTag) return { biomes, depths };
+  const idx = indexSections(chunk);
+  if (!idx) return { biomes, depths };
+  const { byY, minSecY } = idx;
+  const minY = minSecY * 16;
 
-  const byY = new Map<number, TagData[]>();
-  let minSecY = Infinity;
-  for (const s of sectionTag.data.data as TagData[][]) {
-    if (childTag(s, 'Y') === undefined) continue;
-    const y = sectionY(s);
-    byY.set(y, s);
-    if (y < minSecY) minSecY = y;
-  }
-  const minY = isFinite(minSecY) ? minSecY * 16 : 0;
-
-  const biomeReaders = new Map<number, BiomeReader | null>();
-  const getBiome = (secY: number): BiomeReader | null => {
-    if (biomeReaders.has(secY)) return biomeReaders.get(secY) ?? null;
-    const s = byY.get(secY);
-    const r = s ? buildBiomeReader(s) : null;
-    biomeReaders.set(secY, r);
-    return r;
-  };
-  const blockReaders = new Map<number, SectionReader | null>();
-  const getBlock = (secY: number): SectionReader | null => {
-    if (blockReaders.has(secY)) return blockReaders.get(secY) ?? null;
-    const s = byY.get(secY);
-    const r = s ? buildReader(s, table) : null;
-    blockReaders.set(secY, r);
-    return r;
-  };
+  const getBiome = memoSection(byY, buildBiomeReader);
+  const getBlock = memoSection(byY, s => buildReader(s, table));
 
   for (let c = 0; c < 256; c++) {
     if (names[c] === null) continue;
@@ -363,20 +369,9 @@ function fastColumns(chunk: Chunk, table: ColorTable): Columns | null {
   if (!coords) return null;
   const [ox, oz] = coords;
 
-  const sectionTag = chunk.sections();
-  if (!sectionTag) return null;
-
-  const byY = new Map<number, TagData[]>();
-  let minSecY = Infinity;
-  let maxSecY = -Infinity;
-  for (const s of sectionTag.data.data as TagData[][]) {
-    if (childTag(s, 'Y') === undefined) continue;
-    const y = sectionY(s);
-    byY.set(y, s);
-    if (y < minSecY) minSecY = y;
-    if (y > maxSecY) maxSecY = y;
-  }
-  if (!isFinite(minSecY)) return null;
+  const idx = indexSections(chunk);
+  if (!idx) return null;
+  const { byY, minSecY, maxSecY } = idx;
 
   const minY = minSecY * 16;
   const maxY = maxSecY * 16 + 15;
@@ -386,14 +381,7 @@ function fastColumns(chunk: Chunk, table: ColorTable): Columns | null {
   const hm = chunk.worldHeights('WORLD_SURFACE');
   if (!hm) return null;
 
-  const readers = new Map<number, SectionReader | null>();
-  const getReader = (secY: number): SectionReader | null => {
-    if (readers.has(secY)) return readers.get(secY) ?? null;
-    const s = byY.get(secY);
-    const r = s ? buildReader(s, table) : null;
-    readers.set(secY, r);
-    return r;
-  };
+  const getReader = memoSection(byY, s => buildReader(s, table));
 
   const names: (string | null)[] = new Array(256).fill(null);
   const heights = new Int32Array(256).fill(EMPTY_HEIGHT);

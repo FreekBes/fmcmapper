@@ -243,8 +243,8 @@ function updateSuperTiles(dir: string, changes: Map<string, Map<string, BiomeFea
     if (existsSync(p)) {
       try { features = (JSON.parse(readFileSync(p, 'utf8')) as GeoJSON).features; } catch { /* redraw */ }
     }
-    const changing = regionMap; // region ids being replaced/removed
-    features = features.filter(f => !changing.has((f.properties as { r?: string }).r ?? ''));
+    // Drop features of the regions being replaced/removed, keep the rest.
+    features = features.filter(f => !regionMap.has((f.properties as { r?: string }).r ?? ''));
     for (const feats of regionMap.values()) if (feats) features.push(...feats);
     if (features.length) writeFileSync(p, JSON.stringify({ type: 'FeatureCollection', features }));
     else { try { if (existsSync(p)) unlinkSync(p); } catch { /* ignore */ } }

@@ -47,6 +47,15 @@ const buf = readFileSync(file);
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 const chunks = new AnvilParser(ab).getAllChunks();
 
+// Open a neighbouring region file as a parser, or null if absent/unreadable.
+function openRegion(path: string): AnvilParser | null {
+  if (!existsSync(path)) return null;
+  try {
+    const b = readFileSync(path);
+    return new AnvilParser(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+  } catch { return null; }
+}
+
 // mc-anvil 2.x reads a scalar TAG_Long little-endian (NBT is big-endian), so
 // LastUpdate comes back byte-swapped. A real tick count is a small non-negative
 // number; if the value is implausible we swap the bytes back. The guard means a
@@ -68,14 +77,11 @@ function readLong(raw: number | bigint): number {
 // that neighbour must redraw. A corner chunk feeds the side + diagonal neighbours.
 const dirtyDirs = new Set<string>();
 const markDirty = (lcx: number, lcz: number): void => {
-  if (lcz === 0) dirtyDirs.add('0,-1');
-  if (lcz === 31) dirtyDirs.add('0,1');
-  if (lcx === 0) dirtyDirs.add('-1,0');
-  if (lcx === 31) dirtyDirs.add('1,0');
-  if (lcx === 0 && lcz === 0) dirtyDirs.add('-1,-1');
-  if (lcx === 31 && lcz === 0) dirtyDirs.add('1,-1');
-  if (lcx === 0 && lcz === 31) dirtyDirs.add('-1,1');
-  if (lcx === 31 && lcz === 31) dirtyDirs.add('1,1');
+  const ex = lcx === 0 ? -1 : lcx === 31 ? 1 : 0; // west/east edge, else interior
+  const ez = lcz === 0 ? -1 : lcz === 31 ? 1 : 0; // north/south edge, else interior
+  if (ez) dirtyDirs.add(`0,${ez}`);
+  if (ex) dirtyDirs.add(`${ex},0`);
+  if (ex && ez) dirtyDirs.add(`${ex},${ez}`); // corner chunk also feeds the diagonal
 };
 let lastUpdate = -1;
 let missing = 0;
@@ -141,13 +147,8 @@ function biomeCells(biome: (string | null)[]): BiomeCells {
 // only requires y in [-64, 256], then matches the chunk's column.
 function northEdgeHeights(): Int32Array {
   const edge = new Int32Array(SIZE).fill(EMPTY_HEIGHT);
-  const nf = join(dirname(file), `r.${rx}.${rz - 1}.mca`);
-  if (!existsSync(nf)) return edge;
-  let parser: AnvilParser;
-  try {
-    const nb = readFileSync(nf);
-    parser = new AnvilParser(nb.buffer.slice(nb.byteOffset, nb.byteOffset + nb.byteLength));
-  } catch { return edge; }
+  const parser = openRegion(join(dirname(file), `r.${rx}.${rz - 1}.mca`));
+  if (!parser) return edge;
   const wz = rz * SIZE - 1; // world Z of the row immediately north of this region
   for (let cx = 0; cx < 32; cx++) {
     let cols;
@@ -170,6 +171,16 @@ function northEdgeHeights(): Int32Array {
 // ---------------------------------------------------------------------------
 
 type Field = { r: Int16Array; g: Int16Array; b: Int16Array; v: Uint8Array };
+
+// The biome-driven tint kinds and how each reads its colour off a BiomeColor.
+// (BiomeColor uses camelCase `dryFoliage`; the tint id is snake_case.)
+type TintKind = 'grass' | 'foliage' | 'dry_foliage' | 'water';
+const PICK: Record<TintKind, (bc: BiomeColor) => number> = {
+  grass: bc => bc.grass,
+  foliage: bc => bc.foliage,
+  dry_foliage: bc => bc.dryFoliage,
+  water: bc => bc.water,
+};
 
 function tintField(grid: (string | null)[], dim: number, pick: (bc: BiomeColor) => number): Field {
   const N = dim * dim;
@@ -252,13 +263,8 @@ function extendedBiome(biome: (string | null)[], h: number, ew: number): (string
       eb[(lz + h) * ew + (lx + h)] = biome[lz * SIZE + lx];
   if (h === 0) return eb;
   for (const [dx, dz] of NEIGHBOURS) {
-    const nf = join(dirname(file), `r.${rx + dx}.${rz + dz}.mca`);
-    if (!existsSync(nf)) continue;
-    let parser: AnvilParser;
-    try {
-      const nb = readFileSync(nf);
-      parser = new AnvilParser(nb.buffer.slice(nb.byteOffset, nb.byteOffset + nb.byteLength));
-    } catch { continue; }
+    const parser = openRegion(join(dirname(file), `r.${rx + dx}.${rz + dz}.mca`));
+    if (!parser) continue;
     const cache = new Map<string, ReturnType<typeof topColumns>>();
     const ex0 = dx < 0 ? 0 : dx > 0 ? h + SIZE : h, ex1 = dx < 0 ? h : dx > 0 ? ew : h + SIZE;
     const ez0 = dz < 0 ? 0 : dz > 0 ? h + SIZE : h, ez1 = dz < 0 ? h : dz > 0 ? ew : h + SIZE;
@@ -322,22 +328,23 @@ async function render(): Promise<void> {
   const H = BLEND_R;
   const EW = SIZE + 2 * H;
   const eb = extendedBiome(biome, H, EW);
-  const blendGrass = blur(tintField(eb, EW, bc => bc.grass), EW, H);
-  const blendFoliage = blur(tintField(eb, EW, bc => bc.foliage), EW, H);
-  const blendDry = blur(tintField(eb, EW, bc => bc.dryFoliage), EW, H);
-  const blendWater = blur(tintField(eb, EW, bc => bc.water), EW, H);
+  // One blurred tint field per kind, keyed for direct lookup.
+  const blends = {
+    grass: blur(tintField(eb, EW, PICK.grass), EW, H),
+    foliage: blur(tintField(eb, EW, PICK.foliage), EW, H),
+    dry_foliage: blur(tintField(eb, EW, PICK.dry_foliage), EW, H),
+    water: blur(tintField(eb, EW, PICK.water), EW, H),
+  } as Record<TintKind, Field>;
 
-  // `ei` is the index into the extended grid for region cell (lx, lz).
-  const tintBase = (kind: 'grass' | 'foliage' | 'dry_foliage' | 'water', ei: number): number => {
-    const fld = kind === 'grass' ? blendGrass
-      : kind === 'foliage' ? blendFoliage
-        : kind === 'dry_foliage' ? blendDry
-          : blendWater;
+  // `ei` is the index into the extended grid for region cell (lx, lz). Prefer the
+  // blurred value; fall back to the cell's own biome colour where the blur saw no
+  // valid samples.
+  const tintBase = (kind: TintKind, ei: number): number => {
+    const fld = blends[kind];
     if (fld.v[ei]) return (fld.r[ei] << 16) | (fld.g[ei] << 8) | fld.b[ei];
     const bn = eb[ei];
     const bc = bn ? biomeColors.get(bn) : undefined;
-    if (!bc) return -1;
-    return kind === 'dry_foliage' ? bc.dryFoliage : bc[kind];
+    return bc ? PICK[kind](bc) : -1;
   };
 
   const northEdge = northEdgeHeights();
