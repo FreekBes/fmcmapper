@@ -193,32 +193,14 @@ async function buildParent(root: string, z: number, x: number, y: number): Promi
   return true;
 }
 
-// --- main -------------------------------------------------------------------
-async function main(): Promise<void> {
-  // Inputs come from positional args, falling back to env vars. Args take
-  // precedence so a CLI invocation can override the environment.
-  const [argWorld, argDimension, argOut] = process.argv.slice(2);
-  const worldPath = argWorld ?? process.env.WORLD_PATH ?? './world';
-  const dimension = argDimension ?? process.env.DIMENSION ?? 'minecraft:overworld';
-  const outDir = argOut ?? process.env.OUTPUT_PATH ?? './output';
-  if (!worldPath) {
-    console.error(
-      'usage: node buildtiles.js <worldPath> [dimension] [outDir]\n' +
-      '   or: WORLD_PATH=... [DIMENSION=...] [OUTPUT_PATH=...] node buildtiles.js\n' +
-      'other env vars: TILER_JOBS (worker count), TILER_FULL=1 (force full rebuild)',
-    );
-    process.exit(1);
-  }
-
+// --- render one pass --------------------------------------------------------
+async function render(worldPath: string, dimension: string, outDir: string): Promise<void> {
   // Concurrency: default to half the cores to keep temps/CPU down.
   const JOBS = Math.max(1, Number(process.env.TILER_JOBS) || Math.floor(cpus().length / 2));
   const forceFull = process.env.TILER_FULL === '1' || process.env.TILER_FULL === 'true';
 
   const regions = listRegions(regionDir(worldPath, dimension));
-  if (regions.length === 0) {
-    console.error('no region files found');
-    process.exit(1);
-  }
+  if (regions.length === 0) throw new Error('no region files found');
 
   const { spawn, version } = readLevel(worldPath);
   if (version && version.dataVersion !== null && version.dataVersion !== TARGET_DATA_VERSION) {
@@ -251,6 +233,22 @@ async function main(): Promise<void> {
 
   const reason = incr ? '' : ` (${forceFull ? 'forced' : cached ? 'world grew/changed' : 'first run'})`;
   console.error(`${incr ? 'incremental' : 'full'} build${reason} — regions: ${regions.length}, grid base ${Tx}x${Ty}, origin (${originRx},${originRz}), zooms 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
+
+  // Write meta.json + the viewer up front so the map server can serve the page
+  // immediately; tiles then appear (or refresh) as this render produces them.
+  // Everything the viewer needs (origin, zoom, spawn, version) is known by now.
+  const meta: MapMeta = {
+    maxZoom: MAXZOOM,
+    minX: originRx * TILE,
+    minZ: originRz * TILE,
+    tileSize: TILE,
+    spawn,
+    dimension,
+    version,
+    targetVersion: { name: TARGET_VERSION, dataVersion: TARGET_DATA_VERSION },
+  };
+  writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 2));
+  writeViewer(outDir, meta);
 
   // Decide which regions to hand to workers. Files whose mtime is unchanged are
   // skipped without parsing at all.
@@ -331,20 +329,59 @@ async function main(): Promise<void> {
     regions: newRegions,
   };
   writeFileSync(join(outDir, MANIFEST), JSON.stringify(manifestOut));
-
-  const meta: MapMeta = {
-    maxZoom: MAXZOOM,
-    minX: originRx * TILE,
-    minZ: originRz * TILE,
-    tileSize: TILE,
-    spawn,
-    dimension,
-    version,
-    targetVersion: { name: TARGET_VERSION, dataVersion: TARGET_DATA_VERSION },
-  };
-  writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 2));
-  writeViewer(outDir, meta);
   console.error(`done (${incr ? 'incremental' : 'full'}). serve ${outDir}/ over HTTP and open index.html`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// --- main -------------------------------------------------------------------
+async function main(): Promise<void> {
+  // Inputs come from positional args, falling back to env vars. Args take
+  // precedence so a CLI invocation can override the environment. The optional
+  // --once flag forces a single render and exit, even if RENDER_INTERVAL is set.
+  const rawArgs = process.argv.slice(2);
+  const once = rawArgs.includes('--once');
+  const [argWorld, argDimension, argOut] = rawArgs.filter(a => a !== '--once');
+  const worldPath = argWorld ?? process.env.WORLD_PATH ?? './world';
+  const dimension = argDimension ?? process.env.DIMENSION ?? 'minecraft:overworld';
+  const outDir = argOut ?? process.env.OUTPUT_PATH ?? './output';
+
+  // Check if the world path exists and is a directory.
+  if (!existsSync(worldPath) || !statSync(worldPath).isDirectory()) {
+    console.error(`world path does not exist or is not a directory: ${worldPath}`);
+    process.exit(1);
+  }
+
+  // Service mode: when RENDER_INTERVAL (minutes) is set, keep re-rendering so a
+  // live world's tiles stay fresh — each pass is incremental, so unchanged
+  // regions are skipped. Unset or 0 -> render once and exit (one-shot).
+  const intervalMin = once ? 0 : Math.max(0, Number(process.env.RENDER_INTERVAL) || 0);
+  if (!intervalMin) {
+    await render(worldPath, dimension, outDir);
+    return;
+  }
+
+  console.error(`service mode: rendering now, then every ${intervalMin}min`);
+  // Stop immediately on signal, abandoning any in-progress render — we don't
+  // need a complete tile set at all times; the next run picks up where it left
+  // off (the manifest is only updated on a fully completed render).
+  const onSignal = (sig: string) => {
+    console.error(`${sig} received — stopping`);
+    process.exit(0);
+  };
+  process.on('SIGINT', () => onSignal('SIGINT'));
+  process.on('SIGTERM', () => onSignal('SIGTERM'));
+
+  for (;;) {
+    try {
+      await render(worldPath, dimension, outDir);
+    } catch (e) {
+      console.error(`render failed (will retry in ${intervalMin}min):`, e instanceof Error ? e.message : e);
+    }
+    await sleep(intervalMin * 60_000);
+  }
 }
 
 main().catch(e => {

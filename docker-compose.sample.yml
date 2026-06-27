@@ -20,9 +20,11 @@ services:
   fmcmapper:
     build: .
     container_name: fmcmapper
-    restart: "no"
+    restart: "unless-stopped"
+    environment:
+      RENDER_INTERVAL: "5" # minutes
     volumes:
-      - ./mcserver/world:/app/world
+      - ./mcserver/world:/app/world:ro
       - ./mcserver/fmcmapper:/app/output
     depends_on:
       mcserver:
@@ -38,4 +40,4 @@ services:
       - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
     depends_on:
       fmcmapper:
-        condition: service_completed_successfully
+        condition: service_healthy
