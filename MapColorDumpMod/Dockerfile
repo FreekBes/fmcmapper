@@ -1,8 +1,8 @@
-# map-color-dump — Fabric mod for Minecraft 26.2.
+# map-color-dump — Fabric mod for Minecraft.
 # Builds the mod and launches loom's dev server (`gradlew runServer`), which
 # writes map_colors.json + biome_colors.json (to /out) once the world loads.
 #
-# Minecraft 26.2 needs a full JDK 25 (javac), not just a JRE — loom checks the
+# Minecraft needs a full JDK 25 (javac), not just a JRE — loom checks the
 # JVM Gradle runs on. eclipse-temurin:25-jdk provides it.
 FROM eclipse-temurin:25-jdk
 
@@ -20,7 +20,7 @@ COPY gradlew gradlew.bat settings.gradle build.gradle gradle.properties ./
 COPY gradle ./gradle
 RUN chmod +x gradlew && ./gradlew --no-daemon help
 
-# Step 2: copy the source and build the mod jar (compiles against MC 26.2).
+# Step 2: copy the source and build the mod jar.
 COPY src ./src
 RUN ./gradlew --no-daemon build
 
