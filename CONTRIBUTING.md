@@ -169,6 +169,15 @@ code should be understandable, the added functionality clearly explained, and
 the PR description should make sense on its own. Review anything an AI generates
 before submitting; you're responsible for what you open.
 
+## Live demo (maintainers)
+
+The [live demo](https://freekbes.github.io/fmcmapper/) is published by the
+[`deploy-pages.yml`](.github/workflows/deploy-pages.yml) workflow, which
+downloads an example world, renders it, and deploys to GitHub Pages — so no
+world or tiles are committed to the repo.
+
+The live demo always uses the latest `master` build and a preconfigured world.
+
 ## Where things live
 
 | Path | What it is |

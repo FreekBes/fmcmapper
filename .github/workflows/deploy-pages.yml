@@ -1,0 +1,92 @@
+name: Deploy example map to Pages
+
+# Publishes a live, no-setup demo of the viewer to GitHub Pages. The example
+# world is downloaded at build time from DEMO_WORLD_URL (e.g. a GitHub Release
+# asset), rendered, and deployed — so neither the world nor the tiles are ever
+# committed to the repo.
+#
+# Setup (once):
+#   1. Upload a small Minecraft world (matching the renderer's target version,
+#      26.2) as a .zip, .tar.gz, or .tar.xz — a GitHub Release asset works well.
+#      Tip: .tar.xz of just level.dat + region/ is the smallest. However,
+#      including everything is better in case we ever add more features.
+#      Example: `tar -C ./mcserver -cf - world | xz -9e -T0 > demo-world.tar.xz`
+#   2. Settings → Secrets and variables → Actions → Variables → add
+#      DEMO_WORLD_URL pointing at that archive.
+#   3. Settings → Pages → set Source to "GitHub Actions".
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; let an in-progress run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  WORLD_URL: ${{ vars.DEMO_WORLD_URL }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and extract example world
+        run: |
+          if [ -z "${WORLD_URL:-}" ]; then
+            echo "::error::Set the DEMO_WORLD_URL repository variable to a world archive (.zip/.tar.gz) URL."
+            exit 1
+          fi
+          mkdir -p world-dl
+          echo "Downloading $WORLD_URL"
+          curl -fsSL --retry 3 "$WORLD_URL" -o /tmp/world.archive
+          case "$WORLD_URL" in
+            *.zip)             unzip -q /tmp/world.archive -d world-dl ;;
+            *.tar.gz|*.tgz)    tar -xzf /tmp/world.archive -C world-dl ;;
+            *.tar.xz|*.txz)    tar -xJf /tmp/world.archive -C world-dl ;;
+            *.tar)             tar -xf  /tmp/world.archive -C world-dl ;;
+            *) echo "::error::Unsupported archive type (use .zip, .tar.gz, .tar.xz, or .tar)"; exit 1 ;;
+          esac
+          # The world folder is wherever level.dat lives inside the archive.
+          leveldat="$(find world-dl -maxdepth 4 -name level.dat | head -1)"
+          if [ -z "$leveldat" ]; then
+            echo "::error::No level.dat found in the downloaded archive."
+            exit 1
+          fi
+          echo "WORLD_DIR=$(dirname "$leveldat")" >> "$GITHUB_ENV"
+          echo "Using world dir: $(dirname "$leveldat")"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run build
+
+      # Render the downloaded world once into ./site (the Pages artifact).
+      # Colour tables are read from assets/ (cwd); index.html + tiles land in ./site.
+      - name: Render example map
+        run: WORLD_PATH="$WORLD_DIR" OUTPUT_PATH=site DIMENSION=minecraft:overworld node build/buildtiles.js --once
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

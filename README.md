@@ -17,6 +17,9 @@ grows.
 The map is just static files (images + a web page), so it's cheap to host and
 works behind any web server.
 
+**▶ [Try the live demo](https://freekbes.github.io/fmcmapper/)** — a rendered
+example world you can pan and zoom, no setup required.
+
 ---
 
 ## Contents
