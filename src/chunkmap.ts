@@ -120,6 +120,8 @@ export const TINTS: Record<string, Tint> = {
   // Leaves with a fixed (non-biome) color:
   'minecraft:birch_leaves': 0x80a755,
   'minecraft:spruce_leaves': 0x619961,
+  // Other leaves, such as azalea, cherry and pale oak don't get tinted at all
+  // and feature the same color regardless of the biome.
 };
 
 // ---------------------------------------------------------------------------

@@ -107,7 +107,14 @@ This value only drives the mismatch warning, but keep it correct.
 
 If the new version introduces blocks that should be biome-tinted (new leaves,
 plants, etc.) or changes which blocks tint, also update the `TINTS` table in
-[`src/chunkmap.ts`](src/chunkmap.ts).
+[`src/chunkmap.ts`](src/chunkmap.ts) — and **bump `RENDER_VERSION` in
+[`src/buildtiles.ts`](src/buildtiles.ts)**. The renderer fingerprints its colour
+inputs into the manifest and only does a full rebuild when that fingerprint
+changes. Edits to the colour tables (`assets/*.json`) or the pixel env vars are
+picked up automatically, but a `TINTS`/coloring-code change isn't — so bumping
+`RENDER_VERSION` is what forces existing maps to re-render instead of keeping
+stale tiles. (Leave `MANIFEST_VERSION` alone; bump that only when the on-disk
+tile/biome/manifest layout changes.)
 
 ### 5. Test it
 
@@ -182,7 +189,7 @@ The live demo always uses the latest `master` build and a preconfigured world.
 
 | Path | What it is |
 |------|------------|
-| `src/buildtiles.ts` | Renderer entry point; `TARGET_VERSION` / `TARGET_DATA_VERSION` live here. |
+| `src/buildtiles.ts` | Renderer entry point; `TARGET_VERSION` / `TARGET_DATA_VERSION`, plus `RENDER_VERSION` / `MANIFEST_VERSION`, live here. |
 | `src/chunkmap.ts` | Block/biome → colour logic, including the `TINTS` table. |
 | `src/worker.ts` | Renders one region (worker thread). |
 | `src/viewer.ts` | Generates the Leaflet map viewer (`index.html`). |

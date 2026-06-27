@@ -2,8 +2,9 @@ import { Worker } from 'worker_threads';
 import {
   readdirSync, existsSync, mkdirSync, writeFileSync, readFileSync, statSync, unlinkSync, rmSync,
 } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { cpus } from 'os';
+import { createHash } from 'crypto';
 import sharp from 'sharp';
 sharp.concurrency(1); // keep libvips from fanning out across all cores
 import { MapMeta, writeViewer } from './viewer';
@@ -15,6 +16,32 @@ import { buildBiomeGeoJSON, BIOME_NONE, type GeoJSON } from './biomevector';
 const TILE = 512; // Leaflet tileSize; one base tile == one region
 const MANIFEST = 'render-manifest.json';
 const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
+
+// Bump when the coloring logic or the TINTS table changes — i.e. anything that
+// alters tile pixels but isn't captured by the colour-table file hashes below.
+// It feeds the render signature, so a change forces a full rebuild (otherwise
+// unchanged regions would keep stale tiles).
+const RENDER_VERSION = 1;
+
+// Colour tables + pixel-affecting env knobs (resolved the same way the worker
+// resolves them) — their fingerprint goes in the manifest as the render signature.
+const MAP_COLORS_PATH = process.env.MAP_COLORS_PATH ?? resolve(process.cwd(), 'assets/map_colors.json');
+const BIOME_COLORS_PATH = process.env.BIOME_COLORS_PATH ?? resolve(process.cwd(), 'assets/biome_colors.json');
+const PIXEL_ENV = [
+  'MAP_BRIGHTNESS', 'MAP_FOLIAGE_BRIGHTNESS', 'MAP_GRASS_BRIGHTNESS',
+  'MAP_DRY_FOLIAGE_BRIGHTNESS', 'MAP_WATER_BRIGHTNESS', 'MAP_BIOME_BLEND',
+];
+
+// A short hash of everything (besides the world) that affects rendered pixels.
+// When it changes, cached tiles are stale and the whole map must be rebuilt.
+function renderSignature(): string {
+  const h = createHash('sha1').update(`render:${RENDER_VERSION}`);
+  for (const p of [MAP_COLORS_PATH, BIOME_COLORS_PATH]) {
+    try { h.update(readFileSync(p)); } catch { h.update('\0missing\0'); }
+  }
+  for (const k of PIXEL_ENV) h.update(`\0${k}=${process.env[k] ?? ''}`);
+  return h.digest('hex').slice(0, 16);
+}
 
 // Biome vector layer: the worker decides the cell resolution (it's in each
 // region's payload); regions are grouped into BIOME_SUPER x BIOME_SUPER
@@ -68,6 +95,7 @@ type Manifest = {
   originRx: number;
   originRz: number;
   maxZoom: number;
+  renderSig: string; // fingerprint of colour tables + pixel env (see renderSignature)
   regions: Record<string, RegionEntry>;
 };
 
@@ -81,11 +109,12 @@ function loadManifest(outDir: string): Manifest | null {
   return null;
 }
 
-// Can we reuse the cached tile grid? Only if dimension/tileSize match and every
-// current region still maps into the cached origin + maxZoom envelope (else the
-// tile coordinates would shift and the whole pyramid is invalid).
-function reusable(m: Manifest | null, dimension: string, regions: RegionFile[]): m is Manifest {
-  if (!m || m.dimension !== dimension || m.tileSize !== TILE) return false;
+// Can we reuse the cached tile grid? Only if the render signature matches (else
+// colours/tints changed and every tile is stale), the dimension/tileSize match,
+// and every current region still maps into the cached origin + maxZoom envelope
+// (else the tile coordinates would shift and the whole pyramid is invalid).
+function reusable(m: Manifest | null, dimension: string, regions: RegionFile[], renderSig: string): m is Manifest {
+  if (!m || m.renderSig !== renderSig || m.dimension !== dimension || m.tileSize !== TILE) return false;
   const grid = 2 ** m.maxZoom;
   for (const r of regions) {
     const tx = r.rx - m.originRx;
@@ -284,7 +313,8 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   const Ty = maxRz - minRz + 1;
 
   const cached = loadManifest(outDir);
-  const incr = !forceFull && reusable(cached, dimension, regions);
+  const renderSig = renderSignature();
+  const incr = !forceFull && reusable(cached, dimension, regions, renderSig);
 
   const originRx = incr ? cached.originRx : minRx;
   const originRz = incr ? cached.originRz : minRz;
@@ -303,7 +333,11 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   mkdirSync(tilesRoot, { recursive: true });
   mkdirSync(biomesDir, { recursive: true });
 
-  const reason = incr ? '' : ` (${forceFull ? 'forced' : cached ? 'world grew/changed' : 'first run'})`;
+  const why = forceFull ? 'forced'
+    : !cached ? 'first run'
+      : cached.renderSig !== renderSig ? 'render settings changed'
+        : 'world grew/changed';
+  const reason = incr ? '' : ` (${why})`;
   console.log(`${incr ? 'incremental' : 'full'} build${reason} — regions: ${regions.length}, grid base ${Tx}x${Ty}, origin (${originRx},${originRz}), zooms 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
 
   // Write meta.json + the viewer up front so the map server can serve the page
@@ -413,6 +447,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     originRx,
     originRz,
     maxZoom: MAXZOOM,
+    renderSig,
     regions: newRegions,
   };
   writeFileSync(join(outDir, MANIFEST), JSON.stringify(manifestOut));
