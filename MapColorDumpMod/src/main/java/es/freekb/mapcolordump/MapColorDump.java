@@ -12,6 +12,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.DryFoliageColor;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.GrassColor;
@@ -32,24 +33,27 @@ import java.util.Map;
  * Dumps two tables to the run directory when the server starts:
  *
  *   map_colors.json   - the vanilla map color of every block (default state).
- *   biome_colors.json - the resolved grass / foliage / water color per biome.
+ *   biome_colors.json - the resolved grass / foliage / dry-foliage / water color
+ *                       per biome (dry foliage tints leaf litter).
  *
- * Grass & foliage colors are looked up from the colormap textures. Rather than
- * requiring the client, drop the two PNGs in the run directory:
+ * Grass, foliage & dry-foliage colors are looked up from the colormap textures.
+ * Rather than requiring the client, drop the three PNGs in the run directory:
  *
- *   run/grass.png    (extract from YOUR OWN client jar:
- *   run/foliage.png   assets/minecraft/textures/colormap/*.png)
+ *   run/grass.png        (extract from YOUR OWN client jar:
+ *   run/foliage.png       assets/minecraft/textures/colormap/*.png)
+ *   run/dry_foliage.png
  *
- * and the mod seeds vanilla's GrassColor/FoliageColor from them, so it resolves
- * correctly even headless (./gradlew runServer). If the PNGs are missing, grass
- * and foliage come out as -1 (water still works). Do not commit these PNGs;
- * they're Mojang game files (run/ is gitignored).
+ * and the mod seeds vanilla's GrassColor/FoliageColor/DryFoliageColor from them,
+ * so it resolves correctly even headless (./gradlew runServer). If a PNG is
+ * missing, that color comes out as -1 (water still works). Do not commit these
+ * PNGs; they're Mojang game files (run/ is gitignored).
  *
  * biome_colors.json entries look like:
  *   "minecraft:plains": {
- *     "grass":   { "RGB": 9551193, "hex": "#91BD59" },
- *     "foliage": { "RGB": 7842607, "hex": "#77AB2F" },
- *     "water":   { "RGB": 4159204, "hex": "#3F76E4" }
+ *     "grass":      { "RGB": 9551193, "hex": "#91BD59" },
+ *     "foliage":    { "RGB": 7842607, "hex": "#77AB2F" },
+ *     "dryFoliage": { "RGB": 8082009, "hex": "#7B4F19" },
+ *     "water":      { "RGB": 4159204, "hex": "#3F76E4" }
  *   }
  */
 public class MapColorDump implements ModInitializer {
@@ -158,12 +162,14 @@ public class MapColorDump implements ModInitializer {
 
             int grass = safe(() -> b.getGrassColor(0.0, 0.0));
             int foliage = safe(() -> b.getFoliageColor());
+            int dryFoliage = safe(() -> b.getDryFoliageColor());
             int water = safe(() -> b.getSpecialEffects().waterColor());
-            if (grass < 0 || foliage < 0) missing++;
+            if (grass < 0 || foliage < 0 || dryFoliage < 0) missing++;
 
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("grass", colorObj(grass));
             entry.put("foliage", colorObj(foliage));
+            entry.put("dryFoliage", colorObj(dryFoliage));
             entry.put("water", colorObj(water));
             out.put(id.toString(), entry);
         }
@@ -178,10 +184,12 @@ public class MapColorDump implements ModInitializer {
         }
     }
 
-    // Load run/grass.png and run/foliage.png into vanilla's static colormaps.
+    // Load run/grass.png, run/foliage.png and run/dry_foliage.png into vanilla's
+    // static colormaps (dry foliage tints leaf litter).
     private boolean seedColormaps() {
         int[] grass = loadColormap("grass.png");
         int[] foliage = loadColormap("foliage.png");
+        int[] dryFoliage = loadColormap("dry_foliage.png");
         boolean ok = false;
         if (grass != null) {
             try { GrassColor.init(grass); ok = true; } catch (Throwable t) {
@@ -191,6 +199,11 @@ public class MapColorDump implements ModInitializer {
         if (foliage != null) {
             try { FoliageColor.init(foliage); ok = true; } catch (Throwable t) {
                 System.err.println("[map-color-dump] FoliageColor.init failed: " + t);
+            }
+        }
+        if (dryFoliage != null) {
+            try { DryFoliageColor.init(dryFoliage); ok = true; } catch (Throwable t) {
+                System.err.println("[map-color-dump] DryFoliageColor.init failed: " + t);
             }
         }
         return ok;

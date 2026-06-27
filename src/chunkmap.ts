@@ -66,10 +66,13 @@ export function shadeRGB(rgb: number, shadeIndex: number): [number, number, numb
 // Per-biome colors (from the Fabric mod's biome_colors.json) + tint rules
 // ---------------------------------------------------------------------------
 
-export type BiomeColor = { grass: number; foliage: number; water: number }; // RGB, -1 = none
+export type BiomeColor = { grass: number; foliage: number; dryFoliage: number; water: number }; // RGB, -1 = none
 export type BiomeColors = Map<string, BiomeColor>;
 
-type RawBiome = { grass?: { RGB?: number }; foliage?: { RGB?: number }; water?: { RGB?: number } };
+type RawBiome = {
+  grass?: { RGB?: number }; foliage?: { RGB?: number };
+  dryFoliage?: { RGB?: number }; water?: { RGB?: number };
+};
 
 export function loadBiomeColors(
   file: string = resolve(process.cwd(), 'assets/biome_colors.json'),
@@ -85,15 +88,16 @@ export function loadBiomeColors(
     m.set(name, {
       grass: v.grass?.RGB ?? -1,
       foliage: v.foliage?.RGB ?? -1,
+      dryFoliage: v.dryFoliage?.RGB ?? -1,
       water: v.water?.RGB ?? -1,
     });
   }
   return m;
 }
 
-// How a block is colored: by biome grass/foliage/water tint, a fixed RGB
-// (leaves with a constant color), or — if absent here — its plain map color.
-export type Tint = 'grass' | 'foliage' | 'water' | number;
+// How a block is colored: by biome grass/foliage/dry-foliage/water tint, a fixed
+// RGB (leaves with a constant color), or — if absent here — its plain map color.
+export type Tint = 'grass' | 'foliage' | 'dry_foliage' | 'water' | number;
 
 export const TINTS: Record<string, Tint> = {
   'minecraft:grass_block': 'grass',
@@ -111,6 +115,7 @@ export const TINTS: Record<string, Tint> = {
   'minecraft:dark_oak_leaves': 'foliage',
   'minecraft:mangrove_leaves': 'foliage',
   'minecraft:vine': 'foliage',
+  'minecraft:leaf_litter': 'dry_foliage',
   'minecraft:water': 'water',
   // Leaves with a fixed (non-biome) color:
   'minecraft:birch_leaves': 0x80a755,

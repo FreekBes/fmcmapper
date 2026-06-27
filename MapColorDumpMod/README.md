@@ -1,9 +1,9 @@
 # map-color-dump
 
 A tiny Fabric mod that writes every block's **vanilla map color** to
-`map_colors.json`, plus the resolved grass/foliage/water color per biome to
-`biome_colors.json`. Run it once to get authoritative color tables you can
-feed into the map tiler.
+`map_colors.json`, plus the resolved grass/foliage/dry-foliage/water color per
+biome to `biome_colors.json`. Run it once to get authoritative color tables you
+can feed into the map tiler.
 
 The mod is designed to run headless on a server, so you don't need a client.
 It was written for **Minecraft version 26.2** but may work on future versions with
@@ -31,23 +31,25 @@ Two files in the run directory. First, `map_colors.json`, e.g.:
   (lower -> 0, same -> 1, higher -> 2). Index 3 only appears via external tools.
 - A `mapColorId` of 0 means the block isn't drawn on the map (air, glass, etc.).
 
-Second, `biome_colors.json` — the resolved grass, foliage, and water color per
-biome, used to tint the map by biome for a Bedrock-style look:
+Second, `biome_colors.json` — the resolved grass, foliage, dry-foliage (leaf
+litter), and water color per biome, used to tint the map by biome for a
+Bedrock-style look:
 
 ```json
 {
   "minecraft:plains": {
-    "grass":   { "RGB": 9551193, "hex": "#91BD59" },
-    "foliage": { "RGB": 7842607, "hex": "#77AB2F" },
-    "water":   { "RGB": 4159204, "hex": "#3F76E4" }
+    "grass":      { "RGB": 9551193, "hex": "#91BD59" },
+    "foliage":    { "RGB": 7842607, "hex": "#77AB2F" },
+    "dryFoliage": { "RGB": 8082009, "hex": "#7B4F19" },
+    "water":      { "RGB": 4159204, "hex": "#3F76E4" }
   }
 }
 ```
 
 - `RGB` is a packed `0xRRGGBB` int (`-1` = not resolved); `hex` is for eyeballing.
-- Grass and foliage come from the colormap PNGs you supply when running (see
-  step 3 of Build & run); a `-1` value means the PNGs weren't found in `run/`
-  (or weren't 256x256). Water is server-side and is correct regardless.
+- Grass, foliage and dry-foliage come from the colormap PNGs you supply when
+  running (see step 3 of Build & run); a `-1` value means the PNG wasn't found in
+  `run/` (or wasn't 256x256). Water is server-side and is correct regardless.
 
 ## Running the mod
 
@@ -113,27 +115,28 @@ javac --version
    The mod jar lands in `build/libs/` (use `mapcolor-dump-1.0.0.jar`, not the
    `-sources` jar).
 
-3. **(Optional, for biome grass/foliage tints) provide the colormap textures.**
-   Grass and foliage colors are looked up from the client's colormap PNGs. Drop
-   `grass.png` and `foliage.png` into the **run directory** and the mod seeds
-   vanilla's colormaps from them, so they resolve even headless. The colormaps
-   live inside the client jar (not in `.minecraft/assets`, which is a hash-named
-   blob store), so extract them from a jar you own:
+3. **(Optional, for biome grass/foliage/dry-foliage tints) provide the colormap
+   textures.** These colors are looked up from the client's colormap PNGs. Drop
+   `grass.png`, `foliage.png` and `dry_foliage.png` into the **run directory** and
+   the mod seeds vanilla's colormaps from them, so they resolve even headless. The
+   colormaps live inside the client jar (not in `.minecraft/assets`, which is a
+   hash-named blob store), so extract them from a jar you own:
 
    ```
    JAR=~/.minecraft/versions/26.2/26.2.jar               # adjust to your path
    unzip -l "$JAR" | grep colormap                       # confirm the paths
    unzip -j "$JAR" assets/minecraft/textures/colormap/grass.png \
-                   assets/minecraft/textures/colormap/foliage.png -d run/
+                   assets/minecraft/textures/colormap/foliage.png \
+                   assets/minecraft/textures/colormap/dry_foliage.png -d run/
    ```
 
-   > Note: `grass.png` / `foliage.png` are Mojang game files. Extract them from
-   > your **own** client jar and keep them only in `run/` (which is gitignored) —
-   > do not commit or redistribute them. See Minecraft's usage guidelines. (The
-   > Docker image fetches them from Mojang's CDN automatically, skipping this.)
+   > Note: the colormap PNGs are Mojang game files. Extract them from your **own**
+   > client jar and keep them only in `run/` (which is gitignored) — do not commit
+   > or redistribute them. See Minecraft's usage guidelines. (The Docker image
+   > fetches them from Mojang's CDN automatically, skipping this.)
 
-   Skip this if you only need `map_colors.json`; grass/foliage will then come out
-   as `-1` (water is server-side and resolves regardless).
+   Skip this if you only need `map_colors.json`; the biome tints will then come
+   out as `-1` (water is server-side and resolves regardless).
 
 4. **Run it once to produce the color tables.** Loom's dev server wires in the
    mod + Fabric API automatically:
@@ -145,8 +148,9 @@ javac --version
    Wait for these lines, then stop the server (type `stop`, or Ctrl-C):
 
    ```
-   [map-color-dump] loaded colormap .../run/grass.png      # only if you did step 3
-   [map-color-dump] loaded colormap .../run/foliage.png    # only if you did step 3
+   [map-color-dump] loaded colormap .../run/grass.png       # only if you did step 3
+   [map-color-dump] loaded colormap .../run/foliage.png     # only if you did step 3
+   [map-color-dump] loaded colormap .../run/dry_foliage.png # only if you did step 3
    [map-color-dump] wrote .../run/map_colors.json (N blocks)
    [map-color-dump] wrote .../run/biome_colors.json (M biomes)
    ```

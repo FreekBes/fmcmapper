@@ -41,6 +41,8 @@ const FOLIAGE = process.env.MAP_FOLIAGE_BRIGHTNESS !== undefined ? Number(proces
 // Water gets a little extra darkening on top of its depth shading.
 const WATER_BRIGHT = process.env.MAP_WATER_BRIGHTNESS !== undefined ? Number(process.env.MAP_WATER_BRIGHTNESS) : 0.7;
 const GRASS = process.env.MAP_GRASS_BRIGHTNESS !== undefined ? Number(process.env.MAP_GRASS_BRIGHTNESS) : 0.8;
+// Leaf litter (dry-foliage tint) sits flat on the ground — no extra darkening.
+const DRY_FOLIAGE = process.env.MAP_DRY_FOLIAGE_BRIGHTNESS !== undefined ? Number(process.env.MAP_DRY_FOLIAGE_BRIGHTNESS) : 1;
 // Biome tint blend radius (box of (2r+1)^2 biomes), like vanilla "Biome Blend".
 // 0 disables blending. Default 2 -> 5x5.
 const BLEND_R = process.env.MAP_BIOME_BLEND !== undefined
@@ -221,14 +223,19 @@ async function render(): Promise<void> {
 
   const blendGrass = BLEND_R > 0 ? blur(tintField(biome, bc => bc.grass), BLEND_R) : null;
   const blendFoliage = BLEND_R > 0 ? blur(tintField(biome, bc => bc.foliage), BLEND_R) : null;
+  const blendDry = BLEND_R > 0 ? blur(tintField(biome, bc => bc.dryFoliage), BLEND_R) : null;
   const blendWater = BLEND_R > 0 ? blur(tintField(biome, bc => bc.water), BLEND_R) : null;
 
-  const tintBase = (kind: 'grass' | 'foliage' | 'water', idx: number): number => {
-    const fld = kind === 'grass' ? blendGrass : kind === 'foliage' ? blendFoliage : blendWater;
+  const tintBase = (kind: 'grass' | 'foliage' | 'dry_foliage' | 'water', idx: number): number => {
+    const fld = kind === 'grass' ? blendGrass
+      : kind === 'foliage' ? blendFoliage
+        : kind === 'dry_foliage' ? blendDry
+          : blendWater;
     if (fld && fld.v[idx]) return (fld.r[idx] << 16) | (fld.g[idx] << 8) | fld.b[idx];
     const bn = biome[idx];
     const bc = bn ? biomeColors.get(bn) : undefined;
-    return bc ? bc[kind] : -1;
+    if (!bc) return -1;
+    return kind === 'dry_foliage' ? bc.dryFoliage : bc[kind];
   };
 
   const rgba = new Uint8Array(SIZE * SIZE * 4);
@@ -274,7 +281,9 @@ async function render(): Promise<void> {
           ? BRIGHTNESS * WATER_BRIGHT
           : tint === 'grass'
             ? BRIGHTNESS * GRASS
-            : BRIGHTNESS;
+            : tint === 'dry_foliage'
+              ? BRIGHTNESS * DRY_FOLIAGE
+              : BRIGHTNESS;
       const p = idx * 4;
       rgba[p] = Math.min(255, Math.round(r * f));
       rgba[p + 1] = Math.min(255, Math.round(g * f));

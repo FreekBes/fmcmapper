@@ -9,7 +9,7 @@ it up to date as your world grows.
 
 - 🗺️ Pan and zoom around your whole world in the browser, like Google Maps
 - 🎨 Styled after Minecraft's **in-game map item** — same top-down view, block colours, and height shading
-- 🌳 Biome-accurate grass, foliage, and water tints
+- 🌳 Biome-accurate grass, foliage, leaf-litter, and water tints
 - ⚡ **Incremental** — only re-renders the parts of the world that changed
 - 🔄 Runs continuously, refreshing the map every few minutes
 - 🐳 Ships as a ready-to-run Docker image
@@ -221,6 +221,7 @@ These tweak how the map looks. All are optional.
 | `MAP_BRIGHTNESS`          | `1`     | Overall brightness (1 = unchanged, <1 darker).      |
 | `MAP_FOLIAGE_BRIGHTNESS`  | `0.55`  | Darkening applied to leaves.                        |
 | `MAP_GRASS_BRIGHTNESS`    | `0.8`   | Darkening applied to grass.                         |
+| `MAP_DRY_FOLIAGE_BRIGHTNESS` | `1`  | Darkening applied to leaf litter (dry-foliage tint).|
 | `MAP_WATER_BRIGHTNESS`    | `0.7`   | Darkening applied to water.                         |
 | `MAP_BIOME_BLEND`         | `2`     | Biome colour blend radius (like in-game Biome Blend); `0` disables. |
 
