@@ -6,9 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        For **wrong colours or map appearance**, use the *Map rendering issue*
-        template instead. Use this one for crashes, startup failures, missing
-        tiles, or the viewer not loading.
+        For **wrong colours or map appearance**, use the *Map rendering issue* template instead.
+        Use this one for crashes, startup failures, missing tiles, or the viewer not loading.
   - type: textarea
     id: what-happened
     attributes:

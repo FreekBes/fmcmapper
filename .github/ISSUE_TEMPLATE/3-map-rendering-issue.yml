@@ -6,8 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the report! Rendering issues are far easier to fix when we can
-        **see** them, so please include a screenshot.
+        Thanks for the report! Rendering issues are far easier to fix when we can **see** them, so please include a screenshot.
   - type: textarea
     id: what
     attributes:

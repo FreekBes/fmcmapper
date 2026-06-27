@@ -6,11 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Images are tagged by Minecraft version (e.g. `:26.2`). First check the
-        [published packages](https://github.com/FreekBes/fmcmapper/pkgs/container/fmcmapper)
-        in case it already exists. Want to add it yourself? See
-        [CONTRIBUTING.md](https://github.com/FreekBes/fmcmapper/blob/master/CONTRIBUTING.md)
-        — it's mostly bumping versions and regenerating the colour tables.
+        Images are tagged by Minecraft version (e.g. `:26.2`). First check the [published packages](https://github.com/FreekBes/fmcmapper/pkgs/container/fmcmapper) in case it already exists.
+        Want to add it yourself? See [CONTRIBUTING.md](https://github.com/FreekBes/fmcmapper/blob/master/CONTRIBUTING.md) — it's mostly bumping versions and regenerating the colour tables.
   - type: input
     id: mc-version
     attributes:
