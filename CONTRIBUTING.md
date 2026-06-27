@@ -198,8 +198,10 @@ The live demo always uses the latest `master` build and a preconfigured world.
 |------|------------|
 | `src/buildtiles.ts` | Renderer entry point; `TARGET_VERSION` / `TARGET_DATA_VERSION`, plus `RENDER_VERSION` / `MANIFEST_VERSION`, live here. |
 | `src/chunkmap.ts` | Block/biome → colour logic, including the `TINTS` table. |
+| `src/biomevector.ts` | Generates the biome polygons for a region, used for the tooltip in the map viewer. |
 | `src/worker.ts` | Renders one region (worker thread). |
 | `src/viewer.ts` | Generates the Leaflet map viewer (`index.html`). |
+| `src/renderconfig.ts` | Resolves the `MAP_*` env vars and defaults. |
 | `assets/*.json` | Generated colour tables (commit regenerated ones). |
 | `MapColorDumpMod/` | The Fabric mod that produces the colour tables. |
 | `.github/workflows/` | CI that builds and pushes the images. |
