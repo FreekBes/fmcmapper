@@ -1,0 +1,53 @@
+name: Minecraft version support request
+description: Request a fmcmapper build for a Minecraft version that doesn't have an image yet.
+title: "[Version] Support Minecraft "
+labels: ["version-support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Images are tagged by Minecraft version (e.g. `:26.2`). First check the
+        [published packages](https://github.com/FreekBes/fmcmapper/pkgs/container/fmcmapper)
+        in case it already exists. Want to add it yourself? See
+        [CONTRIBUTING.md](https://github.com/FreekBes/fmcmapper/blob/master/CONTRIBUTING.md)
+        — it's mostly bumping versions and regenerating the colour tables.
+  - type: input
+    id: mc-version
+    attributes:
+      label: Minecraft version
+      placeholder: e.g. 26.3
+    validations:
+      required: true
+  - type: dropdown
+    id: availability
+    attributes:
+      label: Is it available on Fabric yet?
+      description: Check <https://fabricmc.net/develop> — fmcmapper needs Fabric (loader + API) for the version.
+      options:
+        - "Released (stable)"
+        - "Snapshot / pre-release only"
+        - "Not available on Fabric yet"
+        - "Not sure"
+    validations:
+      required: true
+  - type: dropdown
+    id: tried-latest
+    attributes:
+      label: Did you try the :latest image?
+      description: "`:latest` may work for a newer version, though colours could be off."
+      options:
+        - "Haven't tried"
+        - "Tried — worked"
+        - "Tried — colours off / broke"
+  - type: dropdown
+    id: can-pr
+    attributes:
+      label: Are you able and willing to open a pull request and add support for this version yourself?
+      options:
+        - "Yes"
+        - "Maybe, with guidance"
+        - "No"
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context

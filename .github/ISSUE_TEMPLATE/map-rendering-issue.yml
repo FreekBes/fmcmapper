@@ -1,0 +1,85 @@
+name: Map rendering issue
+description: Report a problem with how the map tiles look — wrong colours, missing tiles, artifacts, etc.
+title: "[Rendering] "
+labels: ["rendering"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! Rendering issues are far easier to fix when we can
+        **see** them, so please include a screenshot.
+  - type: textarea
+    id: what
+    attributes:
+      label: What's wrong?
+      description: Describe what the map shows versus what you expected.
+      placeholder: e.g. Spruce leaves render bright green instead of dark; tiles in the desert are missing.
+    validations:
+      required: true
+  - type: input
+    id: mc-version
+    attributes:
+      label: Minecraft version
+      placeholder: e.g. 26.2
+    validations:
+      required: true
+  - type: input
+    id: image-tag
+    attributes:
+      label: fmcmapper image tag / version
+      description: The tag you're running (e.g. `ghcr.io/freekbes/fmcmapper:26.2` or `:latest`). If you built from source, the commit hash.
+      placeholder: e.g. :26.2, :latest, or 1a2b3c4d
+    validations:
+      required: true
+  - type: dropdown
+    id: mismatch-warning
+    attributes:
+      label: Version-mismatch warning?
+      description: >
+        Does the fmcmapper log print "world reports Minecraft … but this renderer
+        was built for …"? This usually explains wrong colours.
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: The affected map area (and the in-game view, if relevant). Drag images in here.
+    validations:
+      required: true
+  - type: textarea
+    id: location
+    attributes:
+      label: Affected location
+      description: Seed + block coordinates or region so we can find the same spot, and which dimension.
+      placeholder: |
+        Seed: 1234567890 (optional if you provide world download)
+        Dimension: minecraft:overworld
+        Around X=1200, Y=64, Z=-340
+  - type: input
+    id: world-download
+    attributes:
+      label: World download (optional)
+      description: >
+        A link to a download of the world — or a trimmed copy of just the
+        affected area — lets us reproduce the exact rendering. Only share a world
+        you're comfortable making public.
+      placeholder: e.g. https://drive.google.com/...
+  - type: textarea
+    id: setup
+    attributes:
+      label: How are you running fmcmapper in combination with your Minecraft server?
+      description: Which compose file / setup, and any non-default `MAP_*`, `RENDER_INTERVAL`, or `TILER_*` settings.
+      placeholder: |
+        - Compose: docker-compose.dev.yml
+        - Env: MAP_BRIGHTNESS=1 (default), default tints
+  - type: textarea
+    id: logs
+    attributes:
+      label: fmcmapper logs
+      description: Output from the renderer (`docker compose logs fmcmapper`), especially any warnings or errors.
+      render: text

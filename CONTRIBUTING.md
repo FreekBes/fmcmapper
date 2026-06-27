@@ -147,6 +147,10 @@ Check that:
 
 ## Opening a pull request
 
+Opening a PR fills in our [template](.github/pull_request_template.md)
+automatically — it has a section with the version-bump checklist below (delete
+it if your PR isn't a version bump).
+
 1. Fork the repository, and optionally branch off `master` to make your changes.
 2. Mention the target Minecraft version in the PR title/description, and note
    any mod code changes you had to make for it (helps the next version bump).

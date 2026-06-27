@@ -1,0 +1,75 @@
+name: Bug report
+description: Something is broken — crash, won't start, tiles not generating, blank viewer, etc.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For **wrong colours or map appearance**, use the *Map rendering issue*
+        template instead. Use this one for crashes, startup failures, missing
+        tiles, or the viewer not loading.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part?
+      options:
+        - Renderer / tiling (fmcmapper container)
+        - Viewer / web page (map doesn't load, etc.)
+        - map-color-dump mod
+        - Docker / Compose setup
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: image-tag
+    attributes:
+      label: fmcmapper image tag / version
+      placeholder: e.g. :26.2, :latest, or a commit hash
+    validations:
+      required: true
+  - type: input
+    id: mc-version
+    attributes:
+      label: Minecraft version
+      placeholder: e.g. 26.2
+  - type: textarea
+    id: setup
+    attributes:
+      label: How are you running fmcmapper in combination with your Minecraft server?
+      description: Compose file / setup and any non-default env (`RENDER_INTERVAL`, `MAP_*`, `TILER_*`, `WORLD_PATH`/`OUTPUT_PATH`).
+      placeholder: |
+        - Compose: docker-compose.dev.yml
+        - Env: RENDER_INTERVAL=5
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant output (`docker compose logs fmcmapper`). Paste any errors or warnings.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and Docker version (`docker --version`).
+      placeholder: e.g. Ubuntu 24.04, Docker 27.1
