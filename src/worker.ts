@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import sharp from 'sharp';
 sharp.concurrency(1);
-import { AnvilParser, findChildTag, NBTParser, Chunk } from 'mc-anvil';
+import { AnvilParser, findChildTag } from 'mc-anvil';
 import {
   topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, TINTS, EMPTY_HEIGHT,
 } from './chunkmap';
@@ -100,40 +100,33 @@ function biomeCells(biome: (string | null)[]): BiomeCells {
   return { res: BIOME_RES, palette, data };
 }
 
-const mod32 = (n: number): number => ((n % 32) + 32) % 32;
-
 // Heights of the block row immediately NORTH of this region (world Z = baseZ-1),
 // read from the south edge of the region above. The top row's vanilla north-
 // shading needs the neighbour's heights; without them it falls back to flat,
-// leaving a seam at every region boundary. Reads only the 32 edge chunks of the
-// neighbour file (cheap), leaving EMPTY_HEIGHT where it/they are absent.
+// leaving a seam at every region boundary. Fetches only the 32 edge chunks of
+// the neighbour (each getChunkContainingCoordinate decompresses just that one
+// chunk), leaving EMPTY_HEIGHT where the region/chunk is absent.
 //
-// We pull chunks straight from the location table (getLocationEntries +
-// getChunkData) rather than AnvilParser.getChunkAtChunkCoordinates: that method
-// is broken in this mc-anvil version — its "valid" predicate returns the chunk
-// only when the stored xPos/zPos DON'T match the request, so a correct lookup
-// yields undefined. getAllChunks would work but decompresses all 1024 chunks
-// just to read 32 edge ones.
+// NB: use getChunkContainingCoordinate, NOT getChunkAtChunkCoordinates — the
+// latter is broken in mc-anvil 2.0.15 (its predicate is inverted, so a matching
+// lookup returns undefined; verified 0/1024). y=0 is arbitrary: containsCoordinate
+// only requires y in [-64, 256], then matches the chunk's column.
 function northEdgeHeights(): Int32Array {
   const edge = new Int32Array(SIZE).fill(EMPTY_HEIGHT);
   const nf = join(dirname(file), `r.${rx}.${rz - 1}.mca`);
   if (!existsSync(nf)) return edge;
   let parser: AnvilParser;
-  let entries: { offset: number; sectorCount: number }[];
   try {
     const nb = readFileSync(nf);
     parser = new AnvilParser(nb.buffer.slice(nb.byteOffset, nb.byteOffset + nb.byteLength));
-    entries = parser.getLocationEntries();
   } catch { return edge; }
-  const cz = rz * 32 - 1; // world chunk Z of the neighbour's southern edge row
+  const wz = rz * SIZE - 1; // world Z of the row immediately north of this region
   for (let cx = 0; cx < 32; cx++) {
-    const e = entries[mod32(rx * 32 + cx) + mod32(cz) * 32];
-    if (!e || e.sectorCount === 0) continue;
-    const cols = (() => {
-      try {
-        return topColumns(new Chunk(new NBTParser(parser.getChunkData(e.offset)).getTag()), table);
-      } catch { return null; }
-    })();
+    let cols;
+    try {
+      const chunk = parser.getChunkContainingCoordinate([baseX + cx * 16, 0, wz]);
+      cols = chunk ? topColumns(chunk, table) : null;
+    } catch { continue; }
     if (!cols) continue;
     for (let clx = 0; clx < 16; clx++) {
       const lx = cols.ox + clx - baseX;
