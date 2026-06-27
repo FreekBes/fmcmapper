@@ -18,6 +18,7 @@ services:
       - ./mcserver:/data
 
   fmcmapper:
+    # image: ghcr.io/freekbes/fmcmapper:latest
     build: .
     container_name: fmcmapper
     restart: "unless-stopped"

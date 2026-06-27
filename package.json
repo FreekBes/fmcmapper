@@ -2,6 +2,14 @@
   "name": "fmcmapper",
   "version": "0.0.1",
   "description": "Minecraft map viewer",
+  "homepage": "https://github.com/FreekBes/fmcmapper",
+  "bugs": {
+    "url": "https://github.com/FreekBes/fmcmapper/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FreekBes/fmcmapper.git"
+  },
   "license": "ISC",
   "author": "Freek Bes",
   "type": "commonjs",

@@ -1,8 +1,10 @@
 services:
   mapcolordump:
+    # image: ghcr.io/freekbes/mapcolor-dump:latest
     build:
       context: ./MapColorDumpMod
       dockerfile: Dockerfile
+    pull_policy: always
     container_name: mapcolordump
     restart: "no"
     environment:
