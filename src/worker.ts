@@ -27,6 +27,10 @@ export type TileResult = {
   rendered: boolean; // did we actually (re)render this region?
   png: Buffer | null; // present iff rendered and the region has terrain
   biome: BiomeCells | null; // present iff rendered and the region has terrain
+  // Neighbour offsets whose biome halo this region feeds and where an edge chunk
+  // changed since last render — i.e. neighbours to redraw so their cross-region
+  // blur stays correct. (Shading invalidation is handled separately.)
+  dirtyEdges: [number, number][];
 };
 
 const { file, rx, rz, since, mtimeMs } = workerData as Job;
@@ -59,17 +63,41 @@ function readLong(raw: number | bigint): number {
 
 // Max LastUpdate (game ticks) across this region's chunks. `missing` counts
 // chunks whose tag we couldn't read, so we re-render rather than risk skipping.
+// We also record which region edges hold a chunk that changed since last render:
+// a neighbour's biome blur halo reads our edge, so a changed edge chunk means
+// that neighbour must redraw. A corner chunk feeds the side + diagonal neighbours.
+const dirtyDirs = new Set<string>();
+const markDirty = (lcx: number, lcz: number): void => {
+  if (lcz === 0) dirtyDirs.add('0,-1');
+  if (lcz === 31) dirtyDirs.add('0,1');
+  if (lcx === 0) dirtyDirs.add('-1,0');
+  if (lcx === 31) dirtyDirs.add('1,0');
+  if (lcx === 0 && lcz === 0) dirtyDirs.add('-1,-1');
+  if (lcx === 31 && lcz === 0) dirtyDirs.add('1,-1');
+  if (lcx === 0 && lcz === 31) dirtyDirs.add('-1,1');
+  if (lcx === 31 && lcz === 31) dirtyDirs.add('1,1');
+};
 let lastUpdate = -1;
 let missing = 0;
 for (const c of chunks) {
   const t = findChildTag(c.root, x => x.name === 'LastUpdate');
+  let changed = true; // unreadable timestamp -> treat as changed (conservative)
   if (t && (typeof t.data === 'number' || typeof t.data === 'bigint')) {
     const v = readLong(t.data);
     if (v > lastUpdate) lastUpdate = v;
+    changed = v > since;
   } else {
     missing++;
   }
+  if (changed) {
+    const co = c.getChunkCoordinates();
+    if (co) markDirty(co[0] - rx * 32, co[1] - rz * 32);
+  }
 }
+const dirtyEdges: [number, number][] = [...dirtyDirs].map(s => {
+  const [a, b] = s.split(',').map(Number);
+  return [a, b];
+});
 
 // Re-render if we've never rendered this region, it advanced, or we couldn't
 // verify a chunk's timestamp.
@@ -79,7 +107,7 @@ const baseX = rx * SIZE;
 const baseZ = rz * SIZE;
 
 function skip(): void {
-  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: false, png: null, biome: null } as TileResult);
+  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: false, png: null, biome: null, dirtyEdges } as TileResult);
 }
 
 // Downsample the per-block surface biome grid to one sample per BIOME_RES block
@@ -143,17 +171,14 @@ function northEdgeHeights(): Int32Array {
 
 type Field = { r: Int16Array; g: Int16Array; b: Int16Array; v: Uint8Array };
 
-function tintField(
-  biome: (string | null)[],
-  pick: (bc: BiomeColor) => number,
-): Field {
-  const N = SIZE * SIZE;
+function tintField(grid: (string | null)[], dim: number, pick: (bc: BiomeColor) => number): Field {
+  const N = dim * dim;
   const r = new Int16Array(N);
   const g = new Int16Array(N);
   const b = new Int16Array(N);
   const v = new Uint8Array(N);
   for (let i = 0; i < N; i++) {
-    const bn = biome[i];
+    const bn = grid[i];
     if (!bn) continue;
     const bc = biomeColors.get(bn);
     if (!bc) continue;
@@ -167,27 +192,27 @@ function tintField(
   return { r, g, b, v };
 }
 
-// Separable box blur that averages only over valid cells (so no-biome holes and
-// region edges don't darken the result).
-function blur(src: Field, rad: number): Field {
-  const N = SIZE * SIZE;
+// Separable box blur over a dim x dim grid that averages only over valid cells
+// (so no-biome holes and grid edges don't darken the result).
+function blur(src: Field, dim: number, rad: number): Field {
+  const N = dim * dim;
   const hr = new Float32Array(N);
   const hg = new Float32Array(N);
   const hb = new Float32Array(N);
   const hc = new Int32Array(N);
 
-  for (let y = 0; y < SIZE; y++) {
-    const row = y * SIZE;
+  for (let y = 0; y < dim; y++) {
+    const row = y * dim;
     let sr = 0, sg = 0, sb = 0, sc = 0;
-    for (let x = 0; x <= rad && x < SIZE; x++) {
+    for (let x = 0; x <= rad && x < dim; x++) {
       if (src.v[row + x]) { sr += src.r[row + x]; sg += src.g[row + x]; sb += src.b[row + x]; sc++; }
     }
-    for (let x = 0; x < SIZE; x++) {
+    for (let x = 0; x < dim; x++) {
       hr[row + x] = sr; hg[row + x] = sg; hb[row + x] = sb; hc[row + x] = sc;
       const out = x - rad;
       if (out >= 0 && src.v[row + out]) { sr -= src.r[row + out]; sg -= src.g[row + out]; sb -= src.b[row + out]; sc--; }
       const inn = x + rad + 1;
-      if (inn < SIZE && src.v[row + inn]) { sr += src.r[row + inn]; sg += src.g[row + inn]; sb += src.b[row + inn]; sc++; }
+      if (inn < dim && src.v[row + inn]) { sr += src.r[row + inn]; sg += src.g[row + inn]; sb += src.b[row + inn]; sc++; }
     }
   }
 
@@ -195,21 +220,65 @@ function blur(src: Field, rad: number): Field {
   const g = new Int16Array(N);
   const b = new Int16Array(N);
   const v = new Uint8Array(N);
-  for (let x = 0; x < SIZE; x++) {
+  for (let x = 0; x < dim; x++) {
     let sr = 0, sg = 0, sb = 0, sc = 0;
-    for (let y = 0; y <= rad && y < SIZE; y++) {
-      const i = y * SIZE + x; sr += hr[i]; sg += hg[i]; sb += hb[i]; sc += hc[i];
+    for (let y = 0; y <= rad && y < dim; y++) {
+      const i = y * dim + x; sr += hr[i]; sg += hg[i]; sb += hb[i]; sc += hc[i];
     }
-    for (let y = 0; y < SIZE; y++) {
-      const i = y * SIZE + x;
+    for (let y = 0; y < dim; y++) {
+      const i = y * dim + x;
       if (sc > 0) { r[i] = Math.round(sr / sc); g[i] = Math.round(sg / sc); b[i] = Math.round(sb / sc); v[i] = 1; }
       const out = y - rad;
-      if (out >= 0) { const j = out * SIZE + x; sr -= hr[j]; sg -= hg[j]; sb -= hb[j]; sc -= hc[j]; }
+      if (out >= 0) { const j = out * dim + x; sr -= hr[j]; sg -= hg[j]; sb -= hb[j]; sc -= hc[j]; }
       const inn = y + rad + 1;
-      if (inn < SIZE) { const j = inn * SIZE + x; sr += hr[j]; sg += hg[j]; sb += hb[j]; sc += hc[j]; }
+      if (inn < dim) { const j = inn * dim + x; sr += hr[j]; sg += hg[j]; sb += hb[j]; sc += hc[j]; }
     }
   }
   return { r, g, b, v };
+}
+
+// Build the region's biome grid extended by a BLEND_R-wide halo on all sides,
+// filled from the 8 neighbouring regions, so the blur blends biome tints across
+// region borders instead of clipping at them. Halo cells stay null where a
+// neighbour region/chunk is absent (the blur just averages what's there). Each
+// neighbour chunk is decompressed once (cached) via getChunkContainingCoordinate.
+const NEIGHBOURS: [number, number][] = [
+  [-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1],
+];
+function extendedBiome(biome: (string | null)[], h: number, ew: number): (string | null)[] {
+  const eb: (string | null)[] = new Array(ew * ew).fill(null);
+  for (let lz = 0; lz < SIZE; lz++)
+    for (let lx = 0; lx < SIZE; lx++)
+      eb[(lz + h) * ew + (lx + h)] = biome[lz * SIZE + lx];
+  if (h === 0) return eb;
+  for (const [dx, dz] of NEIGHBOURS) {
+    const nf = join(dirname(file), `r.${rx + dx}.${rz + dz}.mca`);
+    if (!existsSync(nf)) continue;
+    let parser: AnvilParser;
+    try {
+      const nb = readFileSync(nf);
+      parser = new AnvilParser(nb.buffer.slice(nb.byteOffset, nb.byteOffset + nb.byteLength));
+    } catch { continue; }
+    const cache = new Map<string, ReturnType<typeof topColumns>>();
+    const ex0 = dx < 0 ? 0 : dx > 0 ? h + SIZE : h, ex1 = dx < 0 ? h : dx > 0 ? ew : h + SIZE;
+    const ez0 = dz < 0 ? 0 : dz > 0 ? h + SIZE : h, ez1 = dz < 0 ? h : dz > 0 ? ew : h + SIZE;
+    for (let ez = ez0; ez < ez1; ez++) {
+      for (let ex = ex0; ex < ex1; ex++) {
+        const wx = baseX - h + ex, wz = baseZ - h + ez;
+        const ck = `${wx >> 4},${wz >> 4}`;
+        let cols = cache.get(ck);
+        if (cols === undefined) {
+          try {
+            const ch = parser.getChunkContainingCoordinate([wx, 0, wz]);
+            cols = ch ? topColumns(ch, table) : null;
+          } catch { cols = null; }
+          cache.set(ck, cols);
+        }
+        if (cols) eb[ez * ew + ex] = cols.biomes[(wz - cols.oz) * 16 + (wx - cols.ox)];
+      }
+    }
+  }
+  return eb;
 }
 
 async function render(): Promise<void> {
@@ -243,22 +312,29 @@ async function render(): Promise<void> {
 
   if (!any) {
     // Region has no renderable terrain (e.g. all chunks deleted): no tile.
-    parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png: null, biome: null } as TileResult);
+    parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png: null, biome: null, dirtyEdges } as TileResult);
     return;
   }
 
-  const blendGrass = BLEND_R > 0 ? blur(tintField(biome, bc => bc.grass), BLEND_R) : null;
-  const blendFoliage = BLEND_R > 0 ? blur(tintField(biome, bc => bc.foliage), BLEND_R) : null;
-  const blendDry = BLEND_R > 0 ? blur(tintField(biome, bc => bc.dryFoliage), BLEND_R) : null;
-  const blendWater = BLEND_R > 0 ? blur(tintField(biome, bc => bc.water), BLEND_R) : null;
+  // Blur over the region extended by a BLEND_R halo of neighbouring biomes, so
+  // tints blend across region borders. With BLEND_R = 0 the halo is empty and
+  // the blur is a no-op (each cell keeps its own tint).
+  const H = BLEND_R;
+  const EW = SIZE + 2 * H;
+  const eb = extendedBiome(biome, H, EW);
+  const blendGrass = blur(tintField(eb, EW, bc => bc.grass), EW, H);
+  const blendFoliage = blur(tintField(eb, EW, bc => bc.foliage), EW, H);
+  const blendDry = blur(tintField(eb, EW, bc => bc.dryFoliage), EW, H);
+  const blendWater = blur(tintField(eb, EW, bc => bc.water), EW, H);
 
-  const tintBase = (kind: 'grass' | 'foliage' | 'dry_foliage' | 'water', idx: number): number => {
+  // `ei` is the index into the extended grid for region cell (lx, lz).
+  const tintBase = (kind: 'grass' | 'foliage' | 'dry_foliage' | 'water', ei: number): number => {
     const fld = kind === 'grass' ? blendGrass
       : kind === 'foliage' ? blendFoliage
         : kind === 'dry_foliage' ? blendDry
           : blendWater;
-    if (fld && fld.v[idx]) return (fld.r[idx] << 16) | (fld.g[idx] << 8) | fld.b[idx];
-    const bn = biome[idx];
+    if (fld.v[ei]) return (fld.r[ei] << 16) | (fld.g[ei] << 8) | fld.b[ei];
+    const bn = eb[ei];
     const bc = bn ? biomeColors.get(bn) : undefined;
     if (!bc) return -1;
     return kind === 'dry_foliage' ? bc.dryFoliage : bc[kind];
@@ -270,6 +346,7 @@ async function render(): Promise<void> {
   for (let lz = 0; lz < SIZE; lz++) {
     for (let lx = 0; lx < SIZE; lx++) {
       const idx = lz * SIZE + lx;
+      const ei = (lz + H) * EW + (lx + H); // same cell in the haloed blur grid
       const nm = name[idx];
       if (nm === null) continue;
 
@@ -297,7 +374,7 @@ async function render(): Promise<void> {
       if (tint === undefined) {
         [r, g, b] = colorRGB(table, nm, shadeIndex);
       } else {
-        const base = typeof tint === 'number' ? tint : tintBase(tint, idx);
+        const base = typeof tint === 'number' ? tint : tintBase(tint, ei);
         [r, g, b] = base >= 0 ? shadeRGB(base, shadeIndex) : colorRGB(table, nm, shadeIndex);
       }
 
@@ -320,7 +397,7 @@ async function render(): Promise<void> {
   const png = await sharp(Buffer.from(rgba), { raw: { width: SIZE, height: SIZE, channels: 4 } })
     .png()
     .toBuffer();
-  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(biome) } as TileResult);
+  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(biome), dirtyEdges } as TileResult);
 }
 
 if (!rendered) skip();

@@ -24,7 +24,7 @@ const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
 // captured by the colour-table, render-config, or TINTS hashes below. (Changing
 // a colour table, a MAP_* setting/default, or which blocks tint is detected
 // automatically, so those don't need a bump.)
-const RENDER_VERSION = 3;
+const RENDER_VERSION = 4;
 
 // Colour tables whose contents feed the render signature (resolved like the worker).
 const MAP_COLORS_PATH = process.env.MAP_COLORS_PATH ?? resolve(process.cwd(), 'assets/map_colors.json');
@@ -377,21 +377,8 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     jobs.push({ file: r.file, rx: r.rx, rz: r.rz, since: prev ? prev.lastUpdate : -1, mtimeMs });
   }
 
-  // A region's top-row shading uses the south-edge heights of the region above
-  // it, so when a region changes its SOUTH neighbour's top edge goes stale. Force
-  // that neighbour to redraw too (one level — its own south edge is unaffected).
   const byKey = new Map(regions.map(r => [`${r.rx},${r.rz}`, r]));
   const jobKeys = new Set(jobs.map(j => `${j.rx},${j.rz}`));
-  for (const j of [...jobs]) {
-    const sk = `${j.rx},${j.rz + 1}`;
-    if (jobKeys.has(sk)) continue;
-    const sr = byKey.get(sk);
-    if (!sr) continue;
-    let mtimeMs = 0;
-    try { mtimeMs = statSync(sr.file).mtimeMs; } catch { /* treat as changed */ }
-    jobs.push({ file: sr.file, rx: sr.rx, rz: sr.rz, since: -1, mtimeMs }); // since -1 = force
-    jobKeys.add(sk);
-  }
 
   // Phase 1: (re)render changed base tiles. Per-region biome changes are
   // collected by super-tile and applied together after deletions.
@@ -404,7 +391,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   };
   let rendered = 0;
   let skippedLU = 0;
-  await pool(jobs, JOBS, runWorker, (res) => {
+  const applyResult = (res: TileResult): void => {
     const key = `${res.rx},${res.rz}`;
     newRegions[key] = { lastUpdate: res.lastUpdate, mtimeMs: res.mtimeMs };
     if (!res.rendered) { skippedLU++; return; }
@@ -414,9 +401,44 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     else rmTile(tilesRoot, MAXZOOM, tx, ty); // region became empty
     noteBiome(tx, ty, res.biome ? regionFeatures(res.biome, res.rx, res.rz, `${tx}_${ty}`, minX, minZ, MAXZOOM) : null);
     baseDirty.add(`${tx},${ty}`);
-    if (++rendered % 20 === 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
+    rendered++;
+  };
+
+  // Neighbours to redraw because a chunk on this region's edge changed: the south
+  // neighbour's top-row shading reads our south-edge heights, and every neighbour's
+  // biome blur halo reads the edge facing it. Both needs are covered by dirtyEdges
+  // (the south direction is flagged exactly when a south-edge chunk changed), so an
+  // interior-only change forces nothing.
+  const forceKeys = new Set<string>();
+  const collectForce = (res: TileResult): void => {
+    if (!res.rendered) return;
+    for (const [dx, dz] of res.dirtyEdges) {
+      const nk = `${res.rx + dx},${res.rz + dz}`;
+      if (!jobKeys.has(nk) && byKey.has(nk)) forceKeys.add(nk);
+    }
+  };
+
+  await pool(jobs, JOBS, runWorker, (res) => {
+    applyResult(res);
+    collectForce(res);
+    if (res.rendered && rendered % 20 === 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
   });
   if (rendered % 20 !== 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
+
+  // Phase 1b: redraw the flagged neighbours so their cross-region shading/blur
+  // stays correct. Forced (since = -1); their own edges are unchanged, so they
+  // don't cascade further.
+  const forcedJobs: Job[] = [];
+  for (const nk of forceKeys) {
+    const r = byKey.get(nk)!;
+    let mtimeMs = 0;
+    try { mtimeMs = statSync(r.file).mtimeMs; } catch { /* treat as changed */ }
+    forcedJobs.push({ file: r.file, rx: r.rx, rz: r.rz, since: -1, mtimeMs });
+  }
+  if (forcedJobs.length) {
+    await pool(forcedJobs, JOBS, runWorker, applyResult);
+    console.log(`edge redraws: ${forcedJobs.length} neighbour tile(s)`);
+  }
 
   // Regions that disappeared since last run: drop their tile, dirty the parents.
   let deleted = 0;
