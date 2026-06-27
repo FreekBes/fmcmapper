@@ -41,7 +41,14 @@ fifo="$(mktemp -u)"
 mkfifo "$fifo"
 exec 3<>"$fifo"
 
-./gradlew --no-daemon runServer <"$fifo" 2>&1 | while IFS= read -r line; do
+# Cap how long we wait for the dump. If the server hangs (or the line never
+# comes), `timeout` kills runServer at the deadline so we exit with an error
+# instead of hanging forever. Override with DUMP_TIMEOUT (seconds).
+TIMEOUT="${DUMP_TIMEOUT:-180}"
+done_marker="$(mktemp -u)"
+
+timeout --kill-after=10s "$TIMEOUT" \
+  ./gradlew --no-daemon runServer <"$fifo" 2>&1 | while IFS= read -r line; do
   printf '%s\n' "$line"
   # biome_colors.json is the last table the mod writes (after map_colors.json),
   # so its line means the dump is complete.
@@ -49,10 +56,25 @@ exec 3<>"$fifo"
   case "$line" in
     *"] wrote "*biome_colors.json*)
       echo "[entrypoint] color tables written — stopping server"
+      : > "$done_marker"
       echo stop >&3
       ;;
   esac
 done
+status=${PIPESTATUS[0]}   # exit status of `timeout ... runServer`
 
 exec 3>&-
 rm -f "$fifo"
+
+if [ -f "$done_marker" ]; then
+  rm -f "$done_marker"
+  echo "[entrypoint] done"
+  exit 0
+fi
+rm -f "$done_marker"
+if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+  echo "[entrypoint] ERROR: timed out after ${TIMEOUT}s waiting for the color dump (override with DUMP_TIMEOUT)" >&2
+else
+  echo "[entrypoint] ERROR: server stopped (exit ${status}) before writing the color tables" >&2
+fi
+exit 1
