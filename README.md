@@ -1,9 +1,9 @@
 # fmcmapper
 
-**fmcmapper** turns your Minecraft world into a zoomable, Google-Maps-style web
-map you can open in any browser. It reads the world straight from disk, renders
-a top-down image of every explored area, and keeps it up to date as your world
-grows.
+**fmcmapper** turns your Minecraft world into a zoomable, lightweight
+Google-Maps-style web map you can open in any browser. It reads the world
+straight from disk, renders a top-down image of every explored area, and keeps
+it up to date as your world grows.
 
 ![The fmcmapper web viewer showing a rendered Minecraft world](assets/fmcmapper.png)
 
