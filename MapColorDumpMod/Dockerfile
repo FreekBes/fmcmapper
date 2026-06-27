@@ -6,6 +6,12 @@
 # JVM Gradle runs on. eclipse-temurin:25-jdk provides it.
 FROM eclipse-temurin:25-jdk
 
+LABEL org.opencontainers.image.source=https://github.com/FreekBes/fmcmapper/tree/master/MapColorDumpMod
+LABEL org.opencontainers.image.description="Fabric mod that dumps Minecraft's vanilla map + biome colours to JSON for fmcmapper. Docs: github.com/FreekBes/fmcmapper/tree/master/MapColorDumpMod"
+LABEL org.opencontainers.image.licenses=MIT
+COPY LICENSE ./
+COPY README.md ./
+
 # Tools run-dump.sh uses to fetch the colormap textures from Mojang's CDN.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl jq unzip \

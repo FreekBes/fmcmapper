@@ -10,7 +10,7 @@
     "type": "git",
     "url": "git+https://github.com/FreekBes/fmcmapper.git"
   },
-  "license": "ISC",
+  "license": "MIT",
   "author": "Freek Bes",
   "type": "commonjs",
   "main": "build/buildtiles.js",

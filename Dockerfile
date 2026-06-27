@@ -6,6 +6,7 @@ RUN npm install
 
 FROM node:24-bullseye AS builder
 WORKDIR /app
+COPY LICENSE ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package*.json ./
 COPY tsconfig.json ./tsconfig.json
@@ -17,10 +18,15 @@ RUN tsc
 FROM node:24-bullseye AS runner
 WORKDIR /app
 ENV NODE_ENV production
+
+LABEL org.opencontainers.image.source=https://github.com/FreekBes/fmcmapper
+LABEL org.opencontainers.image.description="Renders a Minecraft world into a zoomable, in-game-map-styled web map. Docs: github.com/FreekBes/fmcmapper"
+LABEL org.opencontainers.image.licenses=MIT
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/assets ./assets
+COPY README.md ./
 
 # Provide WORLD_PATH (default ./world), DIMENSION (default minecraft:overworld),
 # and OUTPUT_PATH (default ./output)  at runtime,
