@@ -1,21 +1,20 @@
-world/
-output/
+# Dev artifacts
 build/
-dist/
+
+# Dependencies
 node_modules/
+
+# Usage artifacts
+mcserver/
 */.DS_Store
 .DS_Store
 
-assets/grass.png
-assets/foliage.png
-
-# MAPCOLORDUMPMOD
-# Gradle / build
+# MapColorDumpMod Gradle / build
 MapColorDumpMod/.gradle/
 MapColorDumpMod/build/
 !MapColorDumpMod/gradle/wrapper/gradle-wrapper.jar
 
-# IDE
+# MapColorDumpMod IDE
 MapColorDumpMod/.idea/
 MapColorDumpMod/*.iml
 MapColorDumpMod/.vscode/
@@ -23,5 +22,5 @@ MapColorDumpMod/.settings/
 MapColorDumpMod/.classpath
 MapColorDumpMod/.project
 
-# Fabric loom
+# MapColorDumpMod Fabric loom
 MapColorDumpMod/run/

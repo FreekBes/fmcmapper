@@ -1,20 +1,41 @@
 services:
+  # I highly recommend using the itzg/minecraft-server image now that you're looking
+  # into running a Minecraft server service in Docker Compose. It pairs well with fmcmapper!
+  # Do read the documentation of that image here to get started:
+  # https://docker-minecraft-server.readthedocs.io/en/latest/
+  # Simple example:
+  mcserver:
+    image: itzg/minecraft-server
+    container_name: mcserver
+    restart: "unless-stopped"
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: "VANILLA"
+      VERSION: "${MINECRAFT_VERSION:-LATEST}"
+    volumes:
+      - ./mcserver:/data
+
   fmcmapper:
     build: .
     container_name: fmcmapper
     restart: "no"
     volumes:
-      - ./world:/app/world
-      - ./output:/app/output
+      - ./mcserver/world:/app/world
+      - ./mcserver/fmcmapper:/app/output
+    depends_on:
+      mcserver:
+        condition: service_healthy
 
-  server:
+  mapserver:
     image: nginx:alpine
     container_name: fmcmapper-server
     restart: "unless-stopped"
     ports:
       - "8080:80"
     volumes:
-      - ./output:/usr/share/nginx/html:ro
+      - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
     depends_on:
       fmcmapper:
         condition: service_completed_successfully
