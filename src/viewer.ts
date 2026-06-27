@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-// Everything the viewer needs that the tile build computed. Persisted as
+// Everything the viewer needs that drawing the tiles computed. Persisted as
 // meta.json next to the tiles so index.html can be regenerated on its own.
 export type MapMeta = {
   maxZoom: number; // highest native zoom level (one native pixel == one block)
@@ -164,7 +164,7 @@ export function writeViewer(outDir: string, meta?: MapMeta): void {
   writeFileSync(join(outDir, 'index.html'), indexHtml(m));
 }
 
-// Standalone CLI: regenerate index.html from an existing tile build's meta.json.
+// Standalone CLI: regenerate index.html from an existing map's meta.json.
 //   node build/viewer.js [outDir]   (or OUTPUT_PATH=... node build/viewer.js)
 // outDir comes from the positional arg, falling back to env, then a default —
 // matching buildtiles.js so both tools take the same inputs.

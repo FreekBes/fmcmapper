@@ -107,14 +107,21 @@ This value only drives the mismatch warning, but keep it correct.
 
 If the new version introduces blocks that should be biome-tinted (new leaves,
 plants, etc.) or changes which blocks tint, also update the `TINTS` table in
-[`src/chunkmap.ts`](src/chunkmap.ts) — and **bump `RENDER_VERSION` in
-[`src/buildtiles.ts`](src/buildtiles.ts)**. The renderer fingerprints its colour
-inputs into the manifest and only does a full rebuild when that fingerprint
-changes. Edits to the colour tables (`assets/*.json`) or the pixel env vars are
-picked up automatically, but a `TINTS`/coloring-code change isn't — so bumping
-`RENDER_VERSION` is what forces existing maps to re-render instead of keeping
-stale tiles. (Leave `MANIFEST_VERSION` alone; bump that only when the on-disk
-tile/biome/manifest layout changes.)
+[`src/chunkmap.ts`](src/chunkmap.ts).
+
+The renderer fingerprints its colour inputs into the manifest (the **render
+signature**) and does a full redraw whenever that fingerprint changes — so
+existing maps are redrawn instead of keeping stale tiles. It detects these
+**automatically**: the colour tables (`assets/*.json`), the resolved `MAP_*`
+settings (env value *or* default, from [`src/renderconfig.ts`](src/renderconfig.ts)),
+and the `TINTS` table. So editing tints or a brightness default needs **no**
+version bump.
+
+The one thing the signature can't see is the coloring **algorithm** itself —
+the shading math, the blur, the water-depth formula, the fallback colour. If you
+change that logic, **bump `RENDER_VERSION` in [`src/buildtiles.ts`](src/buildtiles.ts)**.
+(And leave `MANIFEST_VERSION` alone unless the on-disk tile/biome/manifest layout
+changes.)
 
 ### 5. Test it
 

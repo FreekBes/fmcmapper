@@ -7,6 +7,7 @@ import {
   topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, TINTS, EMPTY_HEIGHT,
 } from './chunkmap';
 import type { BiomeColor } from './chunkmap';
+import { renderConfig } from './renderconfig';
 
 const SIZE = 512; // one region = 512x512 blocks
 const BIOME_RES = 4; // sample biomes every 4 blocks (Minecraft's native biome cell)
@@ -33,21 +34,9 @@ const { file, rx, rz, since, mtimeMs } = workerData as Job;
 const table = loadColorTable(process.env.MAP_COLORS_PATH);
 const biomeColors = loadBiomeColors(process.env.BIOME_COLORS_PATH);
 
-// Overall darkening (1 = none). Per-type factors below stack on top of this.
-const BRIGHTNESS = process.env.MAP_BRIGHTNESS !== undefined ? Number(process.env.MAP_BRIGHTNESS) : 1;
-// Leaves are a dark texture x the biome tint in-game; the raw tint alone is too
-// bright, so darken leaf blocks extra (foliage-tinted + fixed birch/spruce).
-const FOLIAGE = process.env.MAP_FOLIAGE_BRIGHTNESS !== undefined ? Number(process.env.MAP_FOLIAGE_BRIGHTNESS) : 0.55;
-// Water gets a little extra darkening on top of its depth shading.
-const WATER_BRIGHT = process.env.MAP_WATER_BRIGHTNESS !== undefined ? Number(process.env.MAP_WATER_BRIGHTNESS) : 0.7;
-const GRASS = process.env.MAP_GRASS_BRIGHTNESS !== undefined ? Number(process.env.MAP_GRASS_BRIGHTNESS) : 0.8;
-// Leaf litter (dry-foliage tint) sits flat on the ground — no extra darkening.
-const DRY_FOLIAGE = process.env.MAP_DRY_FOLIAGE_BRIGHTNESS !== undefined ? Number(process.env.MAP_DRY_FOLIAGE_BRIGHTNESS) : 1;
-// Biome tint blend radius (box of (2r+1)^2 biomes), like vanilla "Biome Blend".
-// 0 disables blending. Default 2 -> 5x5.
-const BLEND_R = process.env.MAP_BIOME_BLEND !== undefined
-  ? Math.max(0, Math.min(8, Math.trunc(Number(process.env.MAP_BIOME_BLEND))))
-  : 2;
+// Pixel brightness/blend settings. Defaults live in renderconfig.ts, which the
+// render signature hashes — so changing one there forces a redraw automatically.
+const { brightness: BRIGHTNESS, foliage: FOLIAGE, grass: GRASS, dryFoliage: DRY_FOLIAGE, water: WATER_BRIGHT, blendR: BLEND_R } = renderConfig();
 
 const buf = readFileSync(file);
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);

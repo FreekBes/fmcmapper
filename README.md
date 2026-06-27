@@ -200,7 +200,7 @@ Then serve the `output` folder with any web server (nginx, Caddy, Apache, even
 | `DIMENSION`       | `minecraft:overworld`  | Which dimension to map (`minecraft:the_nether`, `minecraft:the_end`, or a modded id). |
 | `RENDER_INTERVAL` | *(unset)*              | Minutes between renders. **Unset = render once and exit.** Set it to run as a service. |
 | `TILER_JOBS`      | half your CPU cores    | How many regions to render in parallel.                             |
-| `TILER_FULL`      | `0`                    | Set to `1` to force a full rebuild instead of an incremental one.   |
+| `TILER_FULL`      | `0`                    | Set to `1` to force a full redraw instead of an incremental one.    |
 
 The same values can be passed as command-line arguments instead of env vars:
 `world` `dimension` `output`, e.g. `… /app/world minecraft:the_nether /app/out`.
@@ -221,7 +221,7 @@ These tweak how the map looks. All are optional.
 | `MAP_BRIGHTNESS`          | `1`     | Overall brightness (1 = unchanged, <1 darker).      |
 | `MAP_FOLIAGE_BRIGHTNESS`  | `0.55`  | Darkening applied to leaves.                        |
 | `MAP_GRASS_BRIGHTNESS`    | `0.8`   | Darkening applied to grass.                         |
-| `MAP_DRY_FOLIAGE_BRIGHTNESS` | `1`  | Darkening applied to leaf litter (dry-foliage tint).|
+| `MAP_DRY_FOLIAGE_BRIGHTNESS` | `0.8`  | Darkening applied to leaf litter (dry-foliage tint).|
 | `MAP_WATER_BRIGHTNESS`    | `0.7`   | Darkening applied to water.                         |
 | `MAP_BIOME_BLEND`         | `2`     | Biome colour blend radius (like in-game Biome Blend); `0` disables. |
 

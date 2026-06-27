@@ -12,34 +12,34 @@ import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
 import type { TileResult, BiomeCells } from './worker';
 import { buildBiomeGeoJSON, BIOME_NONE, type GeoJSON } from './biomevector';
+import { TINTS } from './chunkmap';
+import { renderConfig } from './renderconfig';
 
 const TILE = 512; // Leaflet tileSize; one base tile == one region
 const MANIFEST = 'render-manifest.json';
 const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
 
-// Bump when the coloring logic or the TINTS table changes — i.e. anything that
-// alters tile pixels but isn't captured by the colour-table file hashes below.
-// It feeds the render signature, so a change forces a full rebuild (otherwise
-// unchanged regions would keep stale tiles).
-const RENDER_VERSION = 1;
+// Bump only when the coloring *algorithm* changes — shading math, the blur, the
+// water-depth formula, the fallback colour — i.e. logic that isn't already
+// captured by the colour-table, render-config, or TINTS hashes below. (Changing
+// a colour table, a MAP_* setting/default, or which blocks tint is detected
+// automatically, so those don't need a bump.)
+const RENDER_VERSION = 2;
 
-// Colour tables + pixel-affecting env knobs (resolved the same way the worker
-// resolves them) — their fingerprint goes in the manifest as the render signature.
+// Colour tables whose contents feed the render signature (resolved like the worker).
 const MAP_COLORS_PATH = process.env.MAP_COLORS_PATH ?? resolve(process.cwd(), 'assets/map_colors.json');
 const BIOME_COLORS_PATH = process.env.BIOME_COLORS_PATH ?? resolve(process.cwd(), 'assets/biome_colors.json');
-const PIXEL_ENV = [
-  'MAP_BRIGHTNESS', 'MAP_FOLIAGE_BRIGHTNESS', 'MAP_GRASS_BRIGHTNESS',
-  'MAP_DRY_FOLIAGE_BRIGHTNESS', 'MAP_WATER_BRIGHTNESS', 'MAP_BIOME_BLEND',
-];
 
-// A short hash of everything (besides the world) that affects rendered pixels.
-// When it changes, cached tiles are stale and the whole map must be rebuilt.
+// A short hash of everything (besides the world) that affects rendered pixels:
+// the colour tables, the resolved render config (MAP_* env-or-default), and the
+// tint rules. When it changes, cached tiles are stale and the map is redrawn.
 function renderSignature(): string {
   const h = createHash('sha1').update(`render:${RENDER_VERSION}`);
   for (const p of [MAP_COLORS_PATH, BIOME_COLORS_PATH]) {
     try { h.update(readFileSync(p)); } catch { h.update('\0missing\0'); }
   }
-  for (const k of PIXEL_ENV) h.update(`\0${k}=${process.env[k] ?? ''}`);
+  h.update('\0cfg=' + JSON.stringify(renderConfig()));
+  h.update('\0tints=' + JSON.stringify(TINTS));
   return h.digest('hex').slice(0, 16);
 }
 
@@ -105,7 +105,7 @@ function loadManifest(outDir: string): Manifest | null {
   try {
     const m = JSON.parse(readFileSync(f, 'utf8')) as Manifest;
     if (m && m.version === MANIFEST_VERSION && m.regions) return m;
-  } catch { /* fall through to full rebuild */ }
+  } catch { /* fall through to full redraw */ }
   return null;
 }
 
@@ -205,7 +205,7 @@ function rmTile(root: string, z: number, x: number, y: number): void {
 }
 
 // --- biome super-tiles ------------------------------------------------------
-// Biomes are fixed at world-gen, so a region's polygons only need (re)building
+// Biomes are fixed at world-gen, so a region's polygons only need (re)drawing
 // when that region itself (re)renders. To keep the viewer's request count down,
 // regions are grouped into BIOME_SUPER x BIOME_SUPER "super-tiles", one GeoJSON
 // file each. Every feature is tagged with its region id, so when a single region
@@ -241,7 +241,7 @@ function updateSuperTiles(dir: string, changes: Map<string, Map<string, BiomeFea
     const p = join(dir, `${sid}.geojson`);
     let features: BiomeFeature[] = [];
     if (existsSync(p)) {
-      try { features = (JSON.parse(readFileSync(p, 'utf8')) as GeoJSON).features; } catch { /* rebuild */ }
+      try { features = (JSON.parse(readFileSync(p, 'utf8')) as GeoJSON).features; } catch { /* redraw */ }
     }
     const changing = regionMap; // region ids being replaced/removed
     features = features.filter(f => !changing.has((f.properties as { r?: string }).r ?? ''));
@@ -261,7 +261,7 @@ function writeBiomeIndex(dir: string): void {
   writeFileSync(join(dir, 'index.json'), JSON.stringify(ids));
 }
 
-// Build one overview tile by compositing up to 4 children (z+1) and halving.
+// Draw one overview tile by compositing up to 4 children (z+1) and halving.
 async function buildParent(root: string, z: number, x: number, y: number): Promise<boolean> {
   const composites: sharp.OverlayOptions[] = [];
   for (let dy = 0; dy < 2; dy++) {
@@ -327,7 +327,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   const tilesRoot = join(outDir, 'tiles');
   const biomesDir = join(outDir, BIOMES_DIR);
   if (!incr) {
-    rmSync(tilesRoot, { recursive: true, force: true }); // clean full rebuild
+    rmSync(tilesRoot, { recursive: true, force: true }); // clean full redraw
     rmSync(biomesDir, { recursive: true, force: true });
   }
   mkdirSync(tilesRoot, { recursive: true });
@@ -338,7 +338,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
       : cached.renderSig !== renderSig ? 'render settings changed'
         : 'world grew/changed';
   const reason = incr ? '' : ` (${why})`;
-  console.log(`${incr ? 'incremental' : 'full'} build${reason} — regions: ${regions.length}, grid base ${Tx}x${Ty}, origin (${originRx},${originRz}), zooms 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
+  console.log(`${incr ? 'incremental' : 'full'} draw${reason} — regions: ${regions.length}, grid base ${Tx}x${Ty}, origin (${originRx},${originRz}), zooms 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
 
   // Write meta.json + the viewer up front so the map server can serve the page
   // immediately; tiles then appear (or refresh) as this render produces them.
@@ -421,7 +421,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   // Apply the collected biome changes to their super-tile files.
   updateSuperTiles(biomesDir, biomeChanges);
 
-  // Phase 2: rebuild only the overview tiles above something that changed.
+  // Phase 2: redraw only the overview tiles above something that changed.
   let dirty = baseDirty;
   for (let z = MAXZOOM - 1; z >= 0; z--) {
     const parents = new Set<string>();
