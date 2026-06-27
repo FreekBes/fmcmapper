@@ -9,9 +9,14 @@ import {
 import type { BiomeColor } from './chunkmap';
 
 const SIZE = 512; // one region = 512x512 blocks
+const BIOME_RES = 4; // sample biomes every 4 blocks (Minecraft's native biome cell)
+const BIOME_CELLS = SIZE / BIOME_RES; // 128 cells per region side
 
 // `since` = the LastUpdate this region was last rendered at (-1 = never).
 type Job = { file: string; rx: number; rz: number; since: number; mtimeMs: number };
+// Per-region surface biome map: `res`-block cells, `data` indexes `palette`
+// (255 = no biome). The grid is square; its side is derivable as region/res.
+export type BiomeCells = { res: number; palette: string[]; data: number[] };
 export type TileResult = {
   rx: number;
   rz: number;
@@ -19,6 +24,7 @@ export type TileResult = {
   mtimeMs: number; // echoed back so the parent can store it
   rendered: boolean; // did we actually (re)render this region?
   png: Buffer | null; // present iff rendered and the region has terrain
+  biome: BiomeCells | null; // present iff rendered and the region has terrain
 };
 
 const { file, rx, rz, since, mtimeMs } = workerData as Job;
@@ -81,7 +87,25 @@ const baseX = rx * SIZE;
 const baseZ = rz * SIZE;
 
 function skip(): void {
-  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: false, png: null } as TileResult);
+  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: false, png: null, biome: null } as TileResult);
+}
+
+// Downsample the per-block surface biome grid to one sample per BIOME_RES block
+// cell, with a compact local palette (index 255 = no biome).
+function biomeCells(biome: (string | null)[]): BiomeCells {
+  const palette: string[] = [];
+  const idOf = new Map<string, number>();
+  const data = new Array<number>(BIOME_CELLS * BIOME_CELLS).fill(255);
+  for (let cz = 0; cz < BIOME_CELLS; cz++) {
+    for (let cx = 0; cx < BIOME_CELLS; cx++) {
+      const nm = biome[(cz * BIOME_RES) * SIZE + cx * BIOME_RES];
+      if (!nm) continue;
+      let id = idOf.get(nm);
+      if (id === undefined) { id = palette.length; idOf.set(nm, id); palette.push(nm); }
+      data[cz * BIOME_CELLS + cx] = id;
+    }
+  }
+  return { res: BIOME_RES, palette, data };
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +215,7 @@ async function render(): Promise<void> {
 
   if (!any) {
     // Region has no renderable terrain (e.g. all chunks deleted): no tile.
-    parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png: null } as TileResult);
+    parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png: null, biome: null } as TileResult);
     return;
   }
 
@@ -261,7 +285,7 @@ async function render(): Promise<void> {
   const png = await sharp(Buffer.from(rgba), { raw: { width: SIZE, height: SIZE, channels: 4 } })
     .png()
     .toBuffer();
-  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png } as TileResult);
+  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(biome) } as TileResult);
 }
 
 if (!rendered) skip();

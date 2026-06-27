@@ -9,11 +9,19 @@ sharp.concurrency(1); // keep libvips from fanning out across all cores
 import { MapMeta, writeViewer } from './viewer';
 import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
-import type { TileResult } from './worker';
+import type { TileResult, BiomeCells } from './worker';
+import { buildBiomeGeoJSON, BIOME_NONE, type GeoJSON } from './biomevector';
 
 const TILE = 512; // Leaflet tileSize; one base tile == one region
 const MANIFEST = 'render-manifest.json';
-const MANIFEST_VERSION = 1;
+const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
+
+// Biome vector layer: the worker decides the cell resolution (it's in each
+// region's payload); regions are grouped into BIOME_SUPER x BIOME_SUPER
+// super-tiles to cut the viewer's request count.
+const BIOME_TOL_CELLS = 2; // "medium" simplification (tolerance in cells, ~8 blocks)
+const BIOME_SUPER = 5; // regions per super-tile side (5x5 = 25 regions/file)
+const BIOMES_DIR = 'biomes'; // super-tile biome GeoJSON, served to the viewer
 
 // Minecraft version this renderer was written for. The bundled map_colors.json /
 // biome_colors.json and the TINTS table in chunkmap.ts were generated against
@@ -167,6 +175,63 @@ function rmTile(root: string, z: number, x: number, y: number): void {
   try { if (existsSync(p)) unlinkSync(p); } catch { /* ignore */ }
 }
 
+// --- biome super-tiles ------------------------------------------------------
+// Biomes are fixed at world-gen, so a region's polygons only need (re)building
+// when that region itself (re)renders. To keep the viewer's request count down,
+// regions are grouped into BIOME_SUPER x BIOME_SUPER "super-tiles", one GeoJSON
+// file each. Every feature is tagged with its region id, so when a single region
+// re-renders we drop just that region's features from the super-tile and re-add
+// the new ones — no separate cache, no global re-merge. Coordinates are global,
+// so the pieces line up.
+type BiomeFeature = GeoJSON['features'][number];
+
+const superId = (tx: number, ty: number): string =>
+  `${Math.floor(tx / BIOME_SUPER)}_${Math.floor(ty / BIOME_SUPER)}`;
+
+// Polygonize one region's cells into features (global CRS.Simple coords), each
+// tagged with its region id so it can be replaced independently later.
+function regionFeatures(
+  cells: BiomeCells, rx: number, rz: number, rid: string,
+  minX: number, minZ: number, maxZoom: number,
+): BiomeFeature[] {
+  const size = TILE / cells.res; // square grid side, e.g. 512/4 = 128
+  const grid = new Uint16Array(size * size);
+  for (let i = 0; i < grid.length; i++) grid[i] = cells.data[i] === 255 ? BIOME_NONE : cells.data[i];
+  const gj = buildBiomeGeoJSON(
+    { grid, width: size, height: size, res: cells.res, minBlockX: rx * TILE, minBlockZ: rz * TILE, palette: cells.palette },
+    minX, minZ, maxZoom, BIOME_TOL_CELLS,
+  );
+  for (const f of gj.features) (f.properties as { r?: string }).r = rid;
+  return gj.features;
+}
+
+// Apply this run's per-region changes to the affected super-tile files: drop the
+// changed regions' old features, add their new ones (null = region went away).
+function updateSuperTiles(dir: string, changes: Map<string, Map<string, BiomeFeature[] | null>>): void {
+  for (const [sid, regionMap] of changes) {
+    const p = join(dir, `${sid}.geojson`);
+    let features: BiomeFeature[] = [];
+    if (existsSync(p)) {
+      try { features = (JSON.parse(readFileSync(p, 'utf8')) as GeoJSON).features; } catch { /* rebuild */ }
+    }
+    const changing = regionMap; // region ids being replaced/removed
+    features = features.filter(f => !changing.has((f.properties as { r?: string }).r ?? ''));
+    for (const feats of regionMap.values()) if (feats) features.push(...feats);
+    if (features.length) writeFileSync(p, JSON.stringify({ type: 'FeatureCollection', features }));
+    else { try { if (existsSync(p)) unlinkSync(p); } catch { /* ignore */ } }
+  }
+}
+
+// List the super-tile GeoJSON files present so the viewer knows what to fetch.
+function writeBiomeIndex(dir: string): void {
+  const ids: string[] = [];
+  for (const f of readdirSync(dir)) {
+    const m = /^(-?\d+_-?\d+)\.geojson$/.exec(f);
+    if (m) ids.push(m[1]);
+  }
+  writeFileSync(join(dir, 'index.json'), JSON.stringify(ids));
+}
+
 // Build one overview tile by compositing up to 4 children (z+1) and halving.
 async function buildParent(root: string, z: number, x: number, y: number): Promise<boolean> {
   const composites: sharp.OverlayOptions[] = [];
@@ -228,11 +293,16 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   const grid = 2 ** MAXZOOM;
 
   const tilesRoot = join(outDir, 'tiles');
-  if (!incr) rmSync(tilesRoot, { recursive: true, force: true }); // clean full rebuild
+  const biomesDir = join(outDir, BIOMES_DIR);
+  if (!incr) {
+    rmSync(tilesRoot, { recursive: true, force: true }); // clean full rebuild
+    rmSync(biomesDir, { recursive: true, force: true });
+  }
   mkdirSync(tilesRoot, { recursive: true });
+  mkdirSync(biomesDir, { recursive: true });
 
   const reason = incr ? '' : ` (${forceFull ? 'forced' : cached ? 'world grew/changed' : 'first run'})`;
-  console.error(`${incr ? 'incremental' : 'full'} build${reason} — regions: ${regions.length}, grid base ${Tx}x${Ty}, origin (${originRx},${originRz}), zooms 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
+  console.log(`${incr ? 'incremental' : 'full'} build${reason} — regions: ${regions.length}, grid base ${Tx}x${Ty}, origin (${originRx},${originRz}), zooms 0..${MAXZOOM}, spawn: ${spawn ? `${spawn.x},${spawn.z}` : 'unknown'}, jobs: ${JOBS}`);
 
   // Write meta.json + the viewer up front so the map server can serve the page
   // immediately; tiles then appear (or refresh) as this render produces them.
@@ -246,6 +316,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     dimension,
     version,
     targetVersion: { name: TARGET_VERSION, dataVersion: TARGET_DATA_VERSION },
+    biomeSuper: BIOME_SUPER,
   };
   writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 2));
   writeViewer(outDir, meta);
@@ -263,14 +334,24 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     let mtimeMs = 0;
     try { mtimeMs = statSync(r.file).mtimeMs; } catch { /* treat as changed */ }
     if (incr && prev && prev.mtimeMs === mtimeMs) {
-      newRegions[key] = prev; // unchanged file -> keep tile + entry
+      newRegions[key] = prev; // unchanged file -> keep tile + super-tile entry
       skippedFile++;
       continue;
     }
     jobs.push({ file: r.file, rx: r.rx, rz: r.rz, since: prev ? prev.lastUpdate : -1, mtimeMs });
   }
 
-  // Phase 1: (re)render changed base tiles.
+  // Phase 1: (re)render changed base tiles. Per-region biome changes are
+  // collected by super-tile and applied together after deletions.
+  const minX = originRx * TILE;
+  const minZ = originRz * TILE;
+  const biomeChanges = new Map<string, Map<string, BiomeFeature[] | null>>();
+  const noteBiome = (tx: number, ty: number, feats: BiomeFeature[] | null): void => {
+    const sid = superId(tx, ty);
+    let m = biomeChanges.get(sid);
+    if (!m) { m = new Map(); biomeChanges.set(sid, m); }
+    m.set(`${tx}_${ty}`, feats);
+  };
   let rendered = 0;
   let skippedLU = 0;
   await pool(jobs, JOBS, runWorker, (res) => {
@@ -281,9 +362,11 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     const ty = res.rz - originRz;
     if (res.png) writePng(tilePath(tilesRoot, MAXZOOM, tx, ty), res.png);
     else rmTile(tilesRoot, MAXZOOM, tx, ty); // region became empty
+    noteBiome(tx, ty, res.biome ? regionFeatures(res.biome, res.rx, res.rz, `${tx}_${ty}`, minX, minZ, MAXZOOM) : null);
     baseDirty.add(`${tx},${ty}`);
-    if (++rendered % 20 === 0) console.error(`rendered: ${rendered}`);
+    if (++rendered % 20 === 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
   });
+  if (rendered % 20 !== 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
 
   // Regions that disappeared since last run: drop their tile, dirty the parents.
   let deleted = 0;
@@ -294,11 +377,15 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     const ty = drz - originRz;
     if (tx >= 0 && ty >= 0 && tx < grid && ty < grid) {
       rmTile(tilesRoot, MAXZOOM, tx, ty);
+      noteBiome(tx, ty, null);
       baseDirty.add(`${tx},${ty}`);
     }
     deleted++;
   }
-  console.error(`base: rendered ${rendered}, unchanged-file ${skippedFile}, unchanged-content ${skippedLU}, deleted ${deleted}`);
+  console.log(`base: rendered ${rendered}, unchanged-file ${skippedFile}, unchanged-content ${skippedLU}, deleted ${deleted}`);
+
+  // Apply the collected biome changes to their super-tile files.
+  updateSuperTiles(biomesDir, biomeChanges);
 
   // Phase 2: rebuild only the overview tiles above something that changed.
   let dirty = baseDirty;
@@ -315,7 +402,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
       if (!ok) rmTile(tilesRoot, z, x, y); // all children gone
       return ok;
     }, ok => { if (ok) made++; });
-    if (arr.length) console.error(`zoom ${z}: ${made}/${arr.length} tiles`);
+    if (arr.length) console.log(`zoom ${z}: ${made}/${arr.length} tiles`);
     dirty = parents;
   }
 
@@ -329,7 +416,11 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     regions: newRegions,
   };
   writeFileSync(join(outDir, MANIFEST), JSON.stringify(manifestOut));
-  console.error(`done (${incr ? 'incremental' : 'full'}). serve ${outDir}/ over HTTP and open index.html`);
+
+  // Refresh the biome index so the viewer knows which region polygons to load.
+  writeBiomeIndex(biomesDir);
+
+  console.log(`done (${incr ? 'incremental' : 'full'}). serve ${outDir}/ over HTTP and open index.html`);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -363,12 +454,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error(`service mode: rendering now, then every ${intervalMin}min`);
+  console.log(`service mode: rendering now, then every ${intervalMin}min`);
   // Stop immediately on signal, abandoning any in-progress render — we don't
   // need a complete tile set at all times; the next run picks up where it left
   // off (the manifest is only updated on a fully completed render).
   const onSignal = (sig: string) => {
-    console.error(`${sig} received — stopping`);
+    console.log(`${sig} received — stopping`);
     process.exit(0);
   };
   process.on('SIGINT', () => onSignal('SIGINT'));

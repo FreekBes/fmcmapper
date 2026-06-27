@@ -15,10 +15,12 @@ export type MapMeta = {
   // colors may be stale.
   version?: { name: string | null; dataVersion: number | null } | null;
   targetVersion?: { name: string; dataVersion: number };
+  biomeSuper?: number; // regions per biome super-tile side (GridLayer tile size)
 };
 
 export function indexHtml(meta: MapMeta): string {
   const { maxZoom, minX, minZ, tileSize, spawn } = meta;
+  const biomeTile = tileSize * (meta.biomeSuper ?? 1); // GridLayer tile = 1 biome super-tile
   const initialZoom = Math.max(0, maxZoom - 2);
   const title = meta.dimension ? `${meta.dimension} map` : 'Dimension map';
   return `<!DOCTYPE html>
@@ -34,6 +36,8 @@ export function indexHtml(meta: MapMeta): string {
   /* keep block-pixels crisp when zoomed past native zoom (no smoothing) */
   .leaflet-tile{image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:crisp-edges}
   .coord{background:rgba(0,0,0,.6);color:#eee;font:12px/1.4 monospace;padding:4px 8px;border-radius:4px}
+  /* biome polygons are invisible but must still catch the cursor */
+  .biome-region{pointer-events:all}
 </style>
 </head>
 <body>
@@ -72,13 +76,72 @@ export function indexHtml(meta: MapMeta): string {
       var d = L.DomUtil.create('div', 'coord');
       d.textContent = 'move the cursor';
       this._d = d;
+      this._x = null; this._z = null; this._b = '';
       return d;
     },
-    set: function (x, z) { this._d.textContent = 'X ' + x + '   Z ' + z; }
+    pos: function (x, z) { this._x = x; this._z = z; this._render(); },
+    biome: function (b) { this._b = b; this._render(); },
+    _render: function () {
+      if (this._x === null) return;
+      var t = 'X ' + this._x + '   Z ' + this._z;
+      if (this._b) t += '   •   ' + this._b;
+      this._d.textContent = t;
+    }
   });
   var coords = new Coords();
   map.addControl(coords);
-  map.on('mousemove', function (e) { var b = toBlock(e.latlng); coords.set(b.x, b.z); });
+  map.on('mousemove', function (e) { var b = toBlock(e.latlng); coords.pos(b.x, b.z); });
+
+  // Biome overlay: invisible interactive polygons that report the biome on hover.
+  // Regions are grouped into super-tiles, one GeoJSON each (biomes/<sx>_<sy>.geojson).
+  // Pinning a GridLayer to the native zoom with a super-tile-sized tile makes each
+  // tile coordinate equal a super-tile, so Leaflet's own tile lifecycle loads the
+  // ones in view and unloads (frees) them as you pan. index.json lists which exist.
+  function prettyBiome(id) {
+    return id.replace(/^[^:]*:/, '').replace(/_/g, ' ').replace(/\\b\\w/g, function (c) { return c.toUpperCase(); });
+  }
+  var biomeStyle = { stroke: false, fill: true, fillOpacity: 0, fillColor: '#ffffff', className: 'biome-region' };
+  function onEachBiome(f, lyr) {
+    var name = prettyBiome(f.properties.biome);
+    lyr.on('mouseover', function () { coords.biome(name); });
+    lyr.on('mouseout', function () { coords.biome(''); });
+  }
+
+  var biomeGroup = L.layerGroup().addTo(map);
+  var biomeAvail = null; // "tx_ty" -> true (exists on disk)
+  var biomeCache = {};   // "tx_ty" -> L.geoJSON (parsed once, re-shown on revisit)
+  function showRegion(id) {
+    if (biomeCache[id]) {
+      if (!biomeGroup.hasLayer(biomeCache[id])) biomeGroup.addLayer(biomeCache[id]);
+      return;
+    }
+    var layer = L.geoJSON(null, { style: biomeStyle, onEachFeature: onEachBiome });
+    biomeCache[id] = layer;
+    biomeGroup.addLayer(layer);
+    fetch('biomes/' + id + '.geojson').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (gj) { if (gj && gj.features) layer.addData(gj); }).catch(function () { /* skip */ });
+  }
+  function hideRegion(id) {
+    if (biomeCache[id] && biomeGroup.hasLayer(biomeCache[id])) biomeGroup.removeLayer(biomeCache[id]);
+  }
+
+  var BiomeGrid = L.GridLayer.extend({
+    createTile: function (coords, done) {
+      var tile = document.createElement('div'); // invisible placeholder; data lives in biomeGroup
+      var id = coords.x + '_' + coords.y;
+      if (biomeAvail && biomeAvail[id]) showRegion(id);
+      setTimeout(function () { done(null, tile); }, 0);
+      return tile;
+    }
+  });
+  // Pinned to the native zoom -> each tile coord is one biome super-tile.
+  var biomeGrid = new BiomeGrid({ tileSize: ${biomeTile}, minNativeZoom: MAXZOOM, maxNativeZoom: MAXZOOM, noWrap: true });
+  biomeGrid.on('tileunload', function (e) { hideRegion(e.coords.x + '_' + e.coords.y); });
+  fetch('biomes/index.json').then(function (r) { return r.ok ? r.json() : []; }).then(function (ids) {
+    biomeAvail = {};
+    ids.forEach(function (id) { biomeAvail[id] = true; });
+    biomeGrid.addTo(map); // start the tile lifecycle once we know what exists
+  }).catch(function () { /* no biome data */ });
 
   if (SPAWN) {
     var c = fromBlock(SPAWN.x, SPAWN.z);
@@ -108,5 +171,5 @@ export function writeViewer(outDir: string, meta?: MapMeta): void {
 if (require.main === module) {
   const outDir = process.argv[2] ?? process.env.OUTPUT_PATH ?? './output';
   writeViewer(outDir);
-  console.error(`wrote ${join(outDir, 'index.html')} from ${join(outDir, 'meta.json')}`);
+  console.log(`wrote ${join(outDir, 'index.html')} from ${join(outDir, 'meta.json')}`);
 }
