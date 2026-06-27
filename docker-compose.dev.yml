@@ -39,6 +39,7 @@ services:
       - "8080:80"
     volumes:
       - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
+      - ./assets/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       fmcmapper:
         condition: service_healthy

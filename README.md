@@ -102,9 +102,24 @@ services:
       - "8080:80"
     volumes:
       - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
+    configs:
+      # Tell browsers to revalidate instead of serving stale tiles, so the map
+      # refreshes as the world changes (unchanged tiles cost only a tiny 304).
+      - source: nginx_cache
+        target: /etc/nginx/conf.d/default.conf
     depends_on:
       fmcmapper:
         condition: service_healthy
+
+configs:
+  nginx_cache:
+    content: |
+      server {
+        listen 80;
+        root   /usr/share/nginx/html;
+        index  index.html;
+        location / { add_header Cache-Control "no-cache"; }
+      }
 ```
 
 The Minecraft version is set to `26.2` in **two** places above — keep them the
