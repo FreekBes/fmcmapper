@@ -1,0 +1,9 @@
+# The run dir isn't shipped: loom creates it, the server generates its config,
+# the mod writes the output, and run-dump.sh fetches the colormaps from Mojang's
+# CDN at runtime. Keeping it out also keeps Mojang assets (the colormap PNGs)
+# out of the image.
+run/
+
+# Local build artifacts (the image rebuilds these).
+build/
+.gradle/

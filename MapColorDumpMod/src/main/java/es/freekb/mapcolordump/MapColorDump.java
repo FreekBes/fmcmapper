@@ -57,12 +57,41 @@ public class MapColorDump implements ModInitializer {
     // The four brightness multipliers the map item applies (then / 255).
     private static final int[] MULTIPLIERS = { 180, 220, 255, 135 };
 
+    // Where the JSON tables are written. Defaults to the run directory (cwd);
+    // set MAPCOLOR_OUTPUT_DIR to redirect them elsewhere — e.g. a small mounted
+    // volume, so you don't have to persist the whole run/ folder.
+    private static final Path OUTPUT_DIR = resolveOutputDir();
+
+    private static Path resolveOutputDir() {
+        String dir = System.getenv("MAPCOLOR_OUTPUT_DIR");
+        return Path.of(dir == null || dir.isBlank() ? "." : dir);
+    }
+
     @Override
     public void onInitialize() {
+        // Fabric invokes "main" entrypoints at the very start of the server's
+        // Main, before vanilla reads eula.txt. Writing it here means the dump
+        // server starts unattended (no manual "echo eula=true").
+        acceptEula();
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             dumpBlocks();
             dumpBiomes(server);
         });
+    }
+
+    // Write eula.txt=true in the run directory so the dedicated server doesn't
+    // halt on first launch. Skips the write if it already agrees.
+    private void acceptEula() {
+        Path p = Path.of("eula.txt");
+        try {
+            if (Files.exists(p) && Files.readString(p).contains("eula=true")) return;
+            Files.writeString(p,
+                "#By changing the setting below to TRUE you are indicating your agreement to our EULA (https://aka.ms/MinecraftEULA).\n"
+                    + "eula=true\n");
+            System.out.println("[map-color-dump] accepted Minecraft EULA -> " + p.toAbsolutePath());
+        } catch (Exception e) {
+            System.err.println("[map-color-dump] failed to write eula.txt: " + e);
+        }
     }
 
     // -- blocks ---------------------------------------------------------------
@@ -202,7 +231,8 @@ public class MapColorDump implements ModInitializer {
 
     private void write(String file, Map<String, Object> out, String what) {
         try {
-            Path p = Path.of(file);
+            Files.createDirectories(OUTPUT_DIR);
+            Path p = OUTPUT_DIR.resolve(file);
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             Files.writeString(p, gson.toJson(out));
             System.out.println("[map-color-dump] wrote " + p.toAbsolutePath()

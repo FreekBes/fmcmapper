@@ -1,0 +1,11 @@
+services:
+  mapcolordump:
+    build:
+      context: ./MapColorDumpMod
+      dockerfile: Dockerfile
+    container_name: mapcolordump
+    restart: "no"
+    environment:
+      - MAPCOLOR_OUTPUT_DIR=/mod/out
+    volumes:
+      - ./assets:/mod/out

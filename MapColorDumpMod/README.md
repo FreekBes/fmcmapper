@@ -1,12 +1,13 @@
 # map-color-dump
 
 A tiny Fabric mod that writes every block's **vanilla map color** to
-`map_colors.json`. Run it once on your Minecraft version (26.2) to get an
-authoritative `block -> color` table you can feed into the map tiler.
+`map_colors.json`, plus the resolved grass/foliage/water color per biome to
+`biome_colors.json`. Run it once on your Minecraft version (26.2) to get
+authoritative color tables you can feed into the map tiler.
 
 ## Output
 
-`map_colors.json` in the run directory, e.g.:
+Two files in the run directory. First, `map_colors.json`, e.g.:
 
 ```json
 {
@@ -25,6 +26,10 @@ authoritative `block -> color` table you can feed into the map tiler.
   picked per column from the height difference with the block to the **north**
   (lower -> 0, same -> 1, higher -> 2). Index 3 only appears via external tools.
 - A `mapColorId` of 0 means the block isn't drawn on the map (air, glass, etc.).
+
+And `biome_colors.json`, the per-biome grass/foliage/water tints — see
+[Biome colors](#biome-colors-grass--foliage--water) below for its format and the
+colormap PNGs it needs.
 
 ## Requirements
 
@@ -68,32 +73,42 @@ javac --version
    The mod jar lands in `build/libs/` (use `mapcolor-dump-1.0.0.jar`, not the
    `-sources` jar).
 
-3. **Run it once to produce `map_colors.json`.** Easiest is loom's dev server,
+3. **Run it once to produce the color tables.** Easiest is loom's dev server,
    which wires in the mod + Fabric API automatically:
 
    ```
    ./gradlew runServer
    ```
 
-   The first run stops on the Minecraft EULA. Accept it and re-run:
-
-   ```
-   echo "eula=true" > run/eula.txt
-   ./gradlew runServer
-   ```
-
-   Wait for this line, then stop the server (type `stop`, or Ctrl-C):
+   Wait for these lines, then stop the server (type `stop`, or Ctrl-C):
 
    ```
    [map-color-dump] wrote .../run/map_colors.json (N blocks)
+   [map-color-dump] wrote .../run/biome_colors.json (N biomes)
    ```
 
-   The file is at `run/map_colors.json`.
+   The files are at `run/map_colors.json` and `run/biome_colors.json`.
 
    **Alternative — your own server:** drop `build/libs/mapcolor-dump-1.0.0.jar`
    plus the Fabric API jar into a 26.2 Fabric server's `mods/`, start once,
-   and collect `map_colors.json` from the server folder. (Running only needs a
+   and collect both JSON files from the server folder. (Running only needs a
    JRE 25; compiling needs the JDK.)
+
+## Run with Docker
+
+The bundled `Dockerfile` does all of the above unattended — no local JDK needed.
+It builds the mod, runs the dev server, fetches the colormap textures from
+Mojang's CDN, dumps the tables, and stops the server on its own.
+
+```
+docker build -t mapcolor-dump .
+docker run --rm -v "$PWD/out:/out" mapcolor-dump
+```
+
+`map_colors.json` and `biome_colors.json` land in `./out`. Only that small
+directory needs to be a volume — the server's `run/` working dir stays inside
+the container. (The mod writes to `MAPCOLOR_OUTPUT_DIR`, which the image sets to
+`/out`.)
 
 ## Notes
 
