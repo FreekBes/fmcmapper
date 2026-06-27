@@ -24,7 +24,7 @@ const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
 // captured by the colour-table, render-config, or TINTS hashes below. (Changing
 // a colour table, a MAP_* setting/default, or which blocks tint is detected
 // automatically, so those don't need a bump.)
-const RENDER_VERSION = 2;
+const RENDER_VERSION = 3;
 
 // Colour tables whose contents feed the render signature (resolved like the worker).
 const MAP_COLORS_PATH = process.env.MAP_COLORS_PATH ?? resolve(process.cwd(), 'assets/map_colors.json');
@@ -375,6 +375,22 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
       continue;
     }
     jobs.push({ file: r.file, rx: r.rx, rz: r.rz, since: prev ? prev.lastUpdate : -1, mtimeMs });
+  }
+
+  // A region's top-row shading uses the south-edge heights of the region above
+  // it, so when a region changes its SOUTH neighbour's top edge goes stale. Force
+  // that neighbour to redraw too (one level — its own south edge is unaffected).
+  const byKey = new Map(regions.map(r => [`${r.rx},${r.rz}`, r]));
+  const jobKeys = new Set(jobs.map(j => `${j.rx},${j.rz}`));
+  for (const j of [...jobs]) {
+    const sk = `${j.rx},${j.rz + 1}`;
+    if (jobKeys.has(sk)) continue;
+    const sr = byKey.get(sk);
+    if (!sr) continue;
+    let mtimeMs = 0;
+    try { mtimeMs = statSync(sr.file).mtimeMs; } catch { /* treat as changed */ }
+    jobs.push({ file: sr.file, rx: sr.rx, rz: sr.rz, since: -1, mtimeMs }); // since -1 = force
+    jobKeys.add(sk);
   }
 
   // Phase 1: (re)render changed base tiles. Per-region biome changes are

@@ -1,8 +1,9 @@
 import { parentPort, workerData } from 'worker_threads';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { dirname, join } from 'path';
 import sharp from 'sharp';
 sharp.concurrency(1);
-import { AnvilParser, findChildTag } from 'mc-anvil';
+import { AnvilParser, findChildTag, NBTParser, Chunk } from 'mc-anvil';
 import {
   topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, TINTS, EMPTY_HEIGHT,
 } from './chunkmap';
@@ -97,6 +98,49 @@ function biomeCells(biome: (string | null)[]): BiomeCells {
     }
   }
   return { res: BIOME_RES, palette, data };
+}
+
+const mod32 = (n: number): number => ((n % 32) + 32) % 32;
+
+// Heights of the block row immediately NORTH of this region (world Z = baseZ-1),
+// read from the south edge of the region above. The top row's vanilla north-
+// shading needs the neighbour's heights; without them it falls back to flat,
+// leaving a seam at every region boundary. Reads only the 32 edge chunks of the
+// neighbour file (cheap), leaving EMPTY_HEIGHT where it/they are absent.
+//
+// We pull chunks straight from the location table (getLocationEntries +
+// getChunkData) rather than AnvilParser.getChunkAtChunkCoordinates: that method
+// is broken in this mc-anvil version — its "valid" predicate returns the chunk
+// only when the stored xPos/zPos DON'T match the request, so a correct lookup
+// yields undefined. getAllChunks would work but decompresses all 1024 chunks
+// just to read 32 edge ones.
+function northEdgeHeights(): Int32Array {
+  const edge = new Int32Array(SIZE).fill(EMPTY_HEIGHT);
+  const nf = join(dirname(file), `r.${rx}.${rz - 1}.mca`);
+  if (!existsSync(nf)) return edge;
+  let parser: AnvilParser;
+  let entries: { offset: number; sectorCount: number }[];
+  try {
+    const nb = readFileSync(nf);
+    parser = new AnvilParser(nb.buffer.slice(nb.byteOffset, nb.byteOffset + nb.byteLength));
+    entries = parser.getLocationEntries();
+  } catch { return edge; }
+  const cz = rz * 32 - 1; // world chunk Z of the neighbour's southern edge row
+  for (let cx = 0; cx < 32; cx++) {
+    const e = entries[mod32(rx * 32 + cx) + mod32(cz) * 32];
+    if (!e || e.sectorCount === 0) continue;
+    const cols = (() => {
+      try {
+        return topColumns(new Chunk(new NBTParser(parser.getChunkData(e.offset)).getTag()), table);
+      } catch { return null; }
+    })();
+    if (!cols) continue;
+    for (let clx = 0; clx < 16; clx++) {
+      const lx = cols.ox + clx - baseX;
+      if (lx >= 0 && lx < SIZE) edge[lx] = cols.heights[15 * 16 + clx]; // local z=15 = south row
+    }
+  }
+  return edge;
 }
 
 // ---------------------------------------------------------------------------
@@ -227,6 +271,8 @@ async function render(): Promise<void> {
     return kind === 'dry_foliage' ? bc.dryFoliage : bc[kind];
   };
 
+  const northEdge = northEdgeHeights();
+
   const rgba = new Uint8Array(SIZE * SIZE * 4);
   for (let lz = 0; lz < SIZE; lz++) {
     for (let lx = 0; lx < SIZE; lx++) {
@@ -235,15 +281,13 @@ async function render(): Promise<void> {
       if (nm === null) continue;
 
       // Vanilla shading: compare against the block to the NORTH (-Z = up on the
-      // tile). At the region's north edge the neighbour is in another region
-      // (not available here) -> use the flat shade (1).
+      // tile). At the region's north edge the neighbour lives in the region above,
+      // whose south-edge heights we loaded into northEdge so the seam matches.
       let shadeIndex = 1;
-      if (lz > 0) {
-        const hN = height[(lz - 1) * SIZE + lx];
-        if (hN !== EMPTY_HEIGHT) {
-          const h = height[idx];
-          shadeIndex = h > hN ? 2 : h < hN ? 0 : 1;
-        }
+      const hN = lz > 0 ? height[(lz - 1) * SIZE + lx] : northEdge[lx];
+      if (hN !== EMPTY_HEIGHT) {
+        const h = height[idx];
+        shadeIndex = h > hN ? 2 : h < hN ? 0 : 1;
       }
 
       const tint = TINTS[nm];
