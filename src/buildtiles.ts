@@ -291,6 +291,8 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   const MAXZOOM = incr ? cached.maxZoom : Math.ceil(Math.log2(Math.max(Tx, Ty, 1)));
   const prevRegions: Record<string, RegionEntry> = incr ? cached.regions : {};
   const grid = 2 ** MAXZOOM;
+  const minX = originRx * TILE; // world block X/Z of native pixel (0,0)
+  const minZ = originRz * TILE;
 
   const tilesRoot = join(outDir, 'tiles');
   const biomesDir = join(outDir, BIOMES_DIR);
@@ -309,8 +311,8 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   // Everything the viewer needs (origin, zoom, spawn, version) is known by now.
   const meta: MapMeta = {
     maxZoom: MAXZOOM,
-    minX: originRx * TILE,
-    minZ: originRz * TILE,
+    minX,
+    minZ,
     tileSize: TILE,
     spawn,
     dimension,
@@ -343,8 +345,6 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
 
   // Phase 1: (re)render changed base tiles. Per-region biome changes are
   // collected by super-tile and applied together after deletions.
-  const minX = originRx * TILE;
-  const minZ = originRz * TILE;
   const biomeChanges = new Map<string, Map<string, BiomeFeature[] | null>>();
   const noteBiome = (tx: number, ty: number, feats: BiomeFeature[] | null): void => {
     const sid = superId(tx, ty);
