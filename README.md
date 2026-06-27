@@ -93,33 +93,19 @@ services:
       mcserver:
         condition: service_healthy
 
-  # A tiny web server that shows the map in your browser.
+  # A tiny web server that serves the map to web browsers.
   mapserver:
-    image: nginx:alpine
+    image: ghcr.io/freekbes/fmcmapper-viewer:latest
+    pull_policy: always
     container_name: fmcmapper-server
     restart: "unless-stopped"
     ports:
       - "8080:80"
     volumes:
       - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
-    configs:
-      # Tell browsers to revalidate instead of serving stale tiles, so the map
-      # refreshes as the world changes (unchanged tiles cost only a tiny 304).
-      - source: nginx_cache
-        target: /etc/nginx/conf.d/default.conf
     depends_on:
       fmcmapper:
         condition: service_healthy
-
-configs:
-  nginx_cache:
-    content: |
-      server {
-        listen 80;
-        root   /usr/share/nginx/html;
-        index  index.html;
-        location / { add_header Cache-Control "no-cache"; }
-      }
 ```
 
 The Minecraft version is set to `26.2` in **two** places above — keep them the
@@ -197,8 +183,16 @@ services:
       - /path/to/output:/app/output         # where the map is written
 ```
 
-Then serve the `output` folder with any web server (nginx, Caddy, Apache, even
-`python -m http.server`) — it's just static files. Open `index.html`.
+Then serve the `output` folder. The simplest option is the companion
+**`ghcr.io/freekbes/fmcmapper-viewer`** image — nginx preconfigured to revalidate
+caches (so the map refreshes as the world changes) and gzip the GeoJSON; just
+mount the output at `/usr/share/nginx/html`. It's version-independent, so pin
+`:latest`. Any other static web server (Caddy, Apache, even `python -m
+http.server`) works too — it's just static files. Open `index.html`.
+
+> 💡 With a plain static server, set `Cache-Control: no-cache` on the output so
+> browsers revalidate changed tiles instead of serving stale ones. The viewer
+> image does this for you; see [`viewer/default.conf`](viewer/default.conf).
 
 > ⚠️ **Match the Minecraft version.** The image tag (`:26.2`) is the Minecraft
 > version its colours were built for. If your world is a *different* version,
