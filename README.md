@@ -26,6 +26,7 @@ example world you can pan and zoom, no setup required.
 
 ## Contents
 
+- [Supported Minecraft versions](#supported-minecraft-versions)
 - [Beginner: run the whole thing with Docker](#beginner-run-the-whole-thing-with-docker)
 - [Beginner: run on singleplayer worlds](#beginner-run-on-singleplayer-worlds)
 - [Advanced: configuration & existing servers](#advanced-configuration--existing-servers)
@@ -37,25 +38,25 @@ example world you can pan and zoom, no setup required.
 
 The following versions of Minecraft (Java Edition) are supported by fmcmapper:
 
-- 26.2.x
+- 26.2.x (tag `:26.2`)
+
+The following versions of Minecraft (Java Edition) are supported but don't have
+their own container tag (use `:26.2` or `:latest` instead, they're backwards-compatible):
 - 26.1.x
 - 1.21.x
 - 1.20.x
-
-The following versions of Minecraft (Java Edition) are theoretically supported, but have not been tested:
-
 - 1.19.x
 - 1.18.x
-
-The following versions of Minecraft (Java Edition) are supported but have slower rendering and have bugged biome tinting:
-
 - 1.17.x
 - 1.16.x
 
-Generally the newest version of fmcmapper is backwards compatible with older
-Minecraft versions, so you can use the latest tag/image to render older worlds.
+Generally the newest version of fmcmapper (tag `:latest`) is backwards compatible
+with these older Minecraft versions, so you can use this version for any world.
 
-Bedrock Edition versions are **not** supported.
+The following versions of Minecraft are **not** supported:
+- Java Edition 1.15.x and older
+- Bedrock Edition
+- Legacy Console Editions
 
 ---
 
