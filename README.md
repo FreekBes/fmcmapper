@@ -1,9 +1,10 @@
 # fmcmapper
 
-**fmcmapper** turns your Minecraft world into a zoomable, lightweight
+**fmcmapper** turns your Minecraft world into a lightweight
 Google-Maps-style web map you can open in any browser. It reads the world
 straight from disk, renders a top-down image of every explored area, and keeps
-it up to date as your world grows.
+it up to date as your world grows. And the best part? It works in vanilla Minecraft.
+No modded server needed. Better yet, no need for a server at all - it is even singleplayer-compatible.
 
 ![The fmcmapper web viewer showing a rendered Minecraft world](assets/fmcmapper.png)
 
@@ -12,12 +13,8 @@ it up to date as your world grows.
 - 🌳 Biome-accurate grass, foliage, leaf-litter, and water tints
 - 📍 Optional **live player positions** (requires multiplayer server + RCON)
 - 🖱️ Display the coordinates + biome when hovering over the map
-- ⚡ Incremental — only re-renders the parts of the world that changed
-- 🔄 Runs continuously, refreshing the map every few minutes
+- ⚡ Keeps your map up to date by continuously re-rendering only changed regions.
 - 🐳 Ships as a ready-to-run Docker image
-
-The map is just static files (images + a web page) — the single fmcmapper
-container renders them and serves them straight to your browser.
 
 **▶ [Try the live demo](https://freekbes.github.io/fmcmapper/)** — a rendered
 example world you can pan and zoom, no setup required.
