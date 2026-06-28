@@ -19,18 +19,25 @@ export const SUBMERGED_PLANTS = new Set([
 
 // How a block is colored: by biome grass/foliage/dry-foliage/water tint, a fixed
 // RGB (leaves with a constant color), or — if absent here — its plain map color.
-export type Tint = 'grass' | 'foliage' | 'dry_foliage' | 'water' | number;
+// `grass_foliage` uses the biome foliage colour but renders brighter than leaves
+// (see renderconfig) — a deliberate departure from vanilla so ground plants don't
+// read as dark as tree leaves.
+export type Tint = 'grass' | 'foliage' | 'grass_foliage' | 'dry_foliage' | 'water' | number;
 
 export const TINTS: Record<string, Tint> = {
+  // The grass *block* uses MapColor.GRASS (the lighter yellow-green).
   'minecraft:grass_block': 'grass',
-  'minecraft:short_grass': 'grass',
-  'minecraft:grass': 'grass', // legacy id (<1.20)
-  'minecraft:tall_grass': 'grass',
-  'minecraft:bush': 'grass',
-  'minecraft:fern': 'grass',
-  'minecraft:large_fern': 'grass',
-  'minecraft:potted_fern': 'grass',
-  'minecraft:sugar_cane': 'grass',
+  // Short/tall grass, ferns, sugar cane, etc. use MapColor.FOLIAGE in vanilla —
+  // the darker, more saturated green, the same map color as leaves — so on the
+  // map they read distinctly from grass blocks. We tint them with the biome
+  // foliage colour but a touch brighter than leaves (grass_foliage).
+  'minecraft:short_grass': 'grass_foliage',
+  'minecraft:grass': 'grass_foliage', // legacy id (<1.20)
+  'minecraft:tall_grass': 'grass_foliage',
+  'minecraft:bush': 'grass_foliage',
+  'minecraft:fern': 'grass_foliage',
+  'minecraft:large_fern': 'grass_foliage',
+  'minecraft:sugar_cane': 'grass_foliage',
   'minecraft:oak_leaves': 'foliage',
   'minecraft:jungle_leaves': 'foliage',
   'minecraft:acacia_leaves': 'foliage',

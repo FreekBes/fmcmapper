@@ -42,7 +42,7 @@ const biomeColors = loadBiomeColors(process.env.BIOME_COLORS_PATH);
 
 // Pixel brightness/blend settings. Defaults live in renderconfig.ts, which the
 // render signature hashes — so changing one there forces a redraw automatically.
-const { brightness: BRIGHTNESS, foliage: FOLIAGE, grass: GRASS, dryFoliage: DRY_FOLIAGE, water: WATER_BRIGHT, blendR: BLEND_R } = renderConfig();
+const { brightness: BRIGHTNESS, foliage: FOLIAGE, grass: GRASS, grassFoliage: GRASS_FOLIAGE, dryFoliage: DRY_FOLIAGE, water: WATER_BRIGHT, blendR: BLEND_R } = renderConfig();
 
 const buf = readFileSync(file);
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
@@ -413,7 +413,9 @@ async function render(): Promise<void> {
       if (tint === undefined) {
         [r, g, b] = colorRGB(table, nm, shadeIndex);
       } else {
-        const base = typeof tint === 'number' ? tint : tintBase(tint, ei);
+        // grass_foliage shares the biome foliage colour, just a brighter factor.
+        const kind = tint === 'grass_foliage' ? 'foliage' : tint;
+        const base = typeof kind === 'number' ? kind : tintBase(kind, ei);
         [r, g, b] = base >= 0 ? shadeRGB(base, shadeIndex) : colorRGB(table, nm, shadeIndex);
       }
 
@@ -423,9 +425,11 @@ async function render(): Promise<void> {
           ? BRIGHTNESS * WATER_BRIGHT
           : tint === 'grass'
             ? BRIGHTNESS * GRASS
-            : tint === 'dry_foliage'
-              ? BRIGHTNESS * DRY_FOLIAGE
-              : BRIGHTNESS;
+            : tint === 'grass_foliage'
+              ? BRIGHTNESS * GRASS_FOLIAGE
+              : tint === 'dry_foliage'
+                ? BRIGHTNESS * DRY_FOLIAGE
+                : BRIGHTNESS;
       const p = idx * 4;
       rgba[p] = Math.min(255, Math.round(r * f));
       rgba[p + 1] = Math.min(255, Math.round(g * f));

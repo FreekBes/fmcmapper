@@ -47,7 +47,7 @@ The following versions of Minecraft (Java Edition) are theoretically supported, 
 - 1.19.x
 - 1.18.x
 
-The following versions of Minecraft (Java Edition) are supported but have slower rendering and lack biome tinting:
+The following versions of Minecraft (Java Edition) are supported but have slower rendering and have bugged biome tinting:
 
 - 1.17.x
 - 1.16.x
@@ -305,7 +305,8 @@ These tweak how the map looks. All are optional.
 |---------------------------|---------|-----------------------------------------------------|
 | `MAP_BRIGHTNESS`          | `1`     | Overall brightness (1 = unchanged, <1 darker).      |
 | `MAP_FOLIAGE_BRIGHTNESS`  | `0.55`  | Darkening applied to leaves.                        |
-| `MAP_GRASS_BRIGHTNESS`    | `0.8`   | Darkening applied to grass.                         |
+| `MAP_GRASS_BRIGHTNESS`    | `0.8`   | Darkening applied to grass blocks.                  |
+| `MAP_GRASS_FOLIAGE_BRIGHTNESS` | `0.8` | Darkening for ground plants (short/tall grass, ferns) — foliage-coloured but brighter than leaves. |
 | `MAP_DRY_FOLIAGE_BRIGHTNESS` | `0.8`  | Darkening applied to leaf litter (dry-foliage tint).|
 | `MAP_WATER_BRIGHTNESS`    | `0.7`   | Darkening applied to water.                         |
 | `MAP_BIOME_BLEND`         | `2`     | Biome colour blend radius (like in-game Biome Blend); `0` disables. |
