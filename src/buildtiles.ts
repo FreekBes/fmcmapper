@@ -537,6 +537,7 @@ async function main(): Promise<void> {
   // regions are skipped. Unset or 0 -> render once and exit (one-shot).
   const intervalMin = once ? 0 : Math.max(0, Number(process.env.RENDER_INTERVAL) || 0);
   if (!intervalMin) {
+    console.log('one-shot mode: rendering once and exiting');
     await render(worldPath, dimension, outDir);
     return;
   }
@@ -558,11 +559,13 @@ async function main(): Promise<void> {
 
   for (;;) {
     try {
+      console.log(`render pass starting at ${new Date().toISOString()}`);
       await render(worldPath, dimension, outDir);
     } catch (e) {
       console.error(`render failed (will retry in ${intervalMin}min):`, e instanceof Error ? e.message : e);
     }
-    await sleep(intervalMin * 60_000);
+    console.log(`render pass finished at ${new Date().toISOString()}, sleeping for ${intervalMin}min`);
+    await sleep(intervalMin * 60000);
   }
 }
 
