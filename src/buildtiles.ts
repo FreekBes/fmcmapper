@@ -12,7 +12,7 @@ import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
 import type { TileResult, BiomeCells } from './worker';
 import { buildBiomeGeoJSON, BIOME_NONE, type GeoJSON } from './biomevector';
-import { TINTS } from './chunkmap';
+import { TINTS, BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS } from './gamedata';
 import { renderConfig } from './renderconfig';
 import { startPlayerTracker } from './players';
 
@@ -25,7 +25,7 @@ const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
 // captured by the colour-table, render-config, or TINTS hashes below. (Changing
 // a colour table, a MAP_* setting/default, or which blocks tint is detected
 // automatically, so those don't need a bump.)
-const RENDER_VERSION = 4;
+const RENDER_VERSION = 5;
 
 // Colour tables whose contents feed the render signature (resolved like the worker).
 const MAP_COLORS_PATH = process.env.MAP_COLORS_PATH ?? resolve(process.cwd(), 'assets/map_colors.json');
@@ -41,6 +41,9 @@ function renderSignature(): string {
   }
   h.update('\0cfg=' + JSON.stringify(renderConfig()));
   h.update('\0tints=' + JSON.stringify(TINTS));
+  h.update('\0aliases=' + JSON.stringify(BLOCK_ALIASES));
+  h.update('\0biomealiases=' + JSON.stringify(BIOME_ALIASES));
+  h.update('\0legacybiomes=' + JSON.stringify(LEGACY_BIOME_IDS));
   return h.digest('hex').slice(0, 16);
 }
 
@@ -52,7 +55,7 @@ const BIOME_SUPER = 5; // regions per super-tile side (5x5 = 25 regions/file)
 const BIOMES_DIR = 'biomes'; // super-tile biome GeoJSON, served to the viewer
 
 // Minecraft version this renderer was written for. The bundled map_colors.json /
-// biome_colors.json and the TINTS table in chunkmap.ts were generated against
+// biome_colors.json and the TINTS table in gamedata.ts were generated against
 // it; if a world reports a different DataVersion the colors may be stale and
 // should be regenerated with the map-color-dump mod for that version.
 const TARGET_VERSION = '26.2';
@@ -298,13 +301,22 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   if (regions.length === 0) throw new Error('no region files found');
 
   const { spawn, version } = readLevel(worldPath);
-  if (version && version.dataVersion !== null && version.dataVersion !== TARGET_DATA_VERSION) {
-    console.error(
-      `WARNING: world reports Minecraft ${version.name ?? '?'} (DataVersion ${version.dataVersion}), ` +
-      `but this renderer was built for ${TARGET_VERSION} (DataVersion ${TARGET_DATA_VERSION}). ` +
-      `The bundled map_colors.json / biome_colors.json may be out of date — regenerate them with ` +
-      `the map-color-dump mod for this version.`,
-    );
+  if (version && version.dataVersion !== null) {
+    if (version.dataVersion > TARGET_DATA_VERSION) {
+      console.warn(
+        `WARNING: world reports Minecraft ${version.name ?? '?'} (DataVersion ${version.dataVersion}), ` +
+        `but this renderer was built for ${TARGET_VERSION} (DataVersion ${TARGET_DATA_VERSION}). ` +
+        `The bundled map_colors.json / biome_colors.json may be out of date — regenerate them with ` +
+        `the map-color-dump mod for this version.`,
+      );
+    }
+    else if (version.dataVersion < TARGET_DATA_VERSION) {
+      console.warn(
+        `WARNING: world reports Minecraft ${version.name ?? '?'} (DataVersion ${version.dataVersion}), ` +
+        `but this renderer was built for ${TARGET_VERSION} (DataVersion ${TARGET_DATA_VERSION}). ` +
+        `The bundled map_colors.json / biome_colors.json may be too new and incompatible.`,
+      );
+    }
   }
   const minRx = Math.min(...regions.map(r => r.rx));
   const maxRx = Math.max(...regions.map(r => r.rx));

@@ -1,7 +1,8 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { Chunk, BlockDataParser, chunkCoordinateFromIndex } from 'mc-anvil';
+import { Chunk, BlockDataParser, chunkCoordinateFromIndex, findChildTagAtPath } from 'mc-anvil';
 import type { TagData, BlockStates, Palette } from 'mc-anvil';
+import { BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS } from './gamedata';
 
 // ---------------------------------------------------------------------------
 // Vanilla map-color palette (from the Fabric map-color-dump mod)
@@ -89,35 +90,6 @@ export function loadBiomeColors(
   return m;
 }
 
-// How a block is colored: by biome grass/foliage/dry-foliage/water tint, a fixed
-// RGB (leaves with a constant color), or — if absent here — its plain map color.
-export type Tint = 'grass' | 'foliage' | 'dry_foliage' | 'water' | number;
-
-export const TINTS: Record<string, Tint> = {
-  'minecraft:grass_block': 'grass',
-  'minecraft:short_grass': 'grass',
-  'minecraft:grass': 'grass', // legacy id (<1.20)
-  'minecraft:tall_grass': 'grass',
-  'minecraft:bush': 'grass',
-  'minecraft:fern': 'grass',
-  'minecraft:large_fern': 'grass',
-  'minecraft:potted_fern': 'grass',
-  'minecraft:sugar_cane': 'grass',
-  'minecraft:oak_leaves': 'foliage',
-  'minecraft:jungle_leaves': 'foliage',
-  'minecraft:acacia_leaves': 'foliage',
-  'minecraft:dark_oak_leaves': 'foliage',
-  'minecraft:mangrove_leaves': 'foliage',
-  'minecraft:vine': 'foliage',
-  'minecraft:leaf_litter': 'dry_foliage',
-  'minecraft:water': 'water',
-  // Leaves with a fixed (non-biome) color:
-  'minecraft:birch_leaves': 0x80a755,
-  'minecraft:spruce_leaves': 0x619961,
-  // Other leaves, such as azalea, cherry and pale oak don't get tinted at all
-  // and feature the same color regardless of the biome.
-};
-
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
@@ -157,7 +129,8 @@ function sectionData(section: TagData[]): { bs?: BlockStates; pal?: Palette } {
 
 const paletteEntryName = (entry: TagData[]): string => {
   const n = entry.find(x => x.name.toLowerCase() === 'name');
-  return typeof n?.data === 'string' ? n.data : '';
+  const nm = typeof n?.data === 'string' ? n.data : '';
+  return BLOCK_ALIASES[nm] ?? nm; // normalise legacy ids to their current name
 };
 
 // A block is drawn unless it's air or its map color is NONE (id 0). Unknown /
@@ -260,7 +233,8 @@ function buildBiomeReader(section: TagData[]): BiomeReader | null {
   const { bs, pal } = biomeContainer(section);
   if (!pal) return null;
   // Biome palette is a LIST of STRING, so data.data is the id array directly.
-  const names = (((pal.data as unknown) as { data?: unknown } | null)?.data as string[]) ?? [];
+  const raw = (((pal.data as unknown) as { data?: unknown } | null)?.data as string[]) ?? [];
+  const names = raw.map(n => BIOME_ALIASES[n] ?? n); // normalise renamed biome ids
   if (names.length === 0) return null;
   if (names.length === 1 || !bs || !(bs.data instanceof ArrayBuffer) || bs.data.byteLength === 0) {
     const only = names[0];
@@ -273,6 +247,32 @@ function buildBiomeReader(section: TagData[]): BiomeReader | null {
       return idx < 0 || idx >= names.length ? null : names[idx];
     },
   };
+}
+
+// Pre-1.18 biomes: a chunk-level numeric `Biomes` array (no per-section palette).
+// 1.15-1.17 store 1024 ids (4x4x4 cells, vertical too); 1.13-1.14 store 256 (2D,
+// one per column). Numeric ids map through LEGACY_BIOME_IDS, then BIOME_ALIASES to
+// today's names. NB: unlike the 1.18 reader, biomeAt's middle arg is the *world* Y
+// (the legacy 3D grid is indexed by absolute height, not a within-section offset).
+function buildLegacyBiomeReader(chunk: Chunk): BiomeReader | null {
+  const tag = findChildTagAtPath('Level/Biomes', chunk.root) ?? findChildTagAtPath('Biomes', chunk.root);
+  const ids = tag?.data;
+  if (!Array.isArray(ids) || ids.length === 0) return null;
+  const name = (id: unknown): string | null => {
+    const n = typeof id === 'number' ? LEGACY_BIOME_IDS[id] : undefined;
+    return n ? (BIOME_ALIASES[n] ?? n) : null;
+  };
+  if (ids.length >= 1024) {
+    // 4x4x4 cells; vertical cell = world Y >> 2, clamped to the 0..63 (0..255) range.
+    return {
+      biomeAt: (lx, wy, lz) => {
+        const yc = Math.min(63, Math.max(0, wy >> 2));
+        return name(ids[(yc << 4) | ((lz >> 2) << 2) | (lx >> 2)]);
+      },
+    };
+  }
+  // 2D: one biome per column, ignoring height.
+  return { biomeAt: (lx, _wy, lz) => name(ids[(lz & 15) * 16 + (lx & 15)]) };
 }
 
 // Index a chunk's sections by their (signed) section Y, tracking the min/max
@@ -329,6 +329,9 @@ function sampleExtras(
 
   const getBiome = memoSection(byY, buildBiomeReader);
   const getBlock = memoSection(byY, s => buildReader(s, table));
+  // Pre-1.18 worlds have no per-section biome palette; fall back to the chunk's
+  // numeric Biomes array (built once, null for 1.18+).
+  let legacyBiome: BiomeReader | null | undefined;
 
   for (let c = 0; c < 256; c++) {
     if (names[c] === null) continue;
@@ -339,7 +342,12 @@ function sampleExtras(
 
     const secY = Math.floor(wy / 16);
     const br = getBiome(secY);
-    if (br) biomes[c] = br.biomeAt(lx, wy - secY * 16, lz);
+    if (br) {
+      biomes[c] = br.biomeAt(lx, wy - secY * 16, lz);
+    } else {
+      if (legacyBiome === undefined) legacyBiome = buildLegacyBiomeReader(chunk);
+      if (legacyBiome) biomes[c] = legacyBiome.biomeAt(lx, wy, lz); // legacy: world Y
+    }
 
     // Water depth: number of water blocks downward from the surface.
     if (names[c] === WATER) {
@@ -359,65 +367,7 @@ function sampleExtras(
 }
 
 // ---------------------------------------------------------------------------
-// Fast path: WORLD_SURFACE heightmap + random-access block reads
-// ---------------------------------------------------------------------------
-
-const STEP_LIMIT = 32; // max blocks to step down past air/NONE before giving up
-
-function fastColumns(chunk: Chunk, table: ColorTable): Columns | null {
-  const coords = chunk.getCoordinates();
-  if (!coords) return null;
-  const [ox, oz] = coords;
-
-  const idx = indexSections(chunk);
-  if (!idx) return null;
-  const { byY, minSecY, maxSecY } = idx;
-
-  const minY = minSecY * 16;
-  const maxY = maxSecY * 16 + 15;
-  // mc-anvil's worldHeights() hardcodes 9-bit entries, valid only up to 512 tall.
-  if (maxY - minY + 1 > 512) return null;
-
-  const hm = chunk.worldHeights('WORLD_SURFACE');
-  if (!hm) return null;
-
-  const getReader = memoSection(byY, s => buildReader(s, table));
-
-  const names: (string | null)[] = new Array(256).fill(null);
-  const heights = new Int32Array(256).fill(EMPTY_HEIGHT);
-
-  for (let z = 0; z < 16; z++) {
-    for (let x = 0; x < 16; x++) {
-      const v = hm[x][z];
-      if (v <= 0) continue; // empty / void column
-      let wy = minY + v - 1; // world Y of the topmost non-air block
-      if (wy > maxY) wy = maxY;
-      const c = z * 16 + x;
-
-      let ok = false;
-      for (let steps = 0; wy >= minY && steps <= STEP_LIMIT; wy--, steps++) {
-        const secY = Math.floor(wy / 16);
-        const rdr = getReader(secY);
-        if (!rdr) continue; // air / NONE-only / absent section
-        const ly = wy - secY * 16;
-        const idx = rdr.idxAt(x, ly, z);
-        if (idx < 0) continue;
-        if (rdr.palDrawable[idx]) {
-          names[c] = rdr.palNames[idx];
-          heights[c] = wy;
-          ok = true;
-          break;
-        }
-        // not drawable (air or NONE) -> keep stepping down
-      }
-      if (!ok) return null; // heightmap path unreliable here -> fall back to scan
-    }
-  }
-  return { ox, oz, names, heights };
-}
-
-// ---------------------------------------------------------------------------
-// Fallback path: top-down section scan (always correct, no heightmap needed)
+// Surface columns: top-down section scan for the topmost drawable block.
 // ---------------------------------------------------------------------------
 
 function scanColumns(chunk: Chunk, table: ColorTable): Columns | null {
@@ -476,40 +426,9 @@ function scanColumns(chunk: Chunk, table: ColorTable): Columns | null {
   return { ox, oz, names, heights };
 }
 
-// ---------------------------------------------------------------------------
-// Dispatcher: prefer the fast path, validate it once end-to-end, fall back
-// to the scan whenever the fast path is unavailable or disagrees.
-// ---------------------------------------------------------------------------
-
-let fastVerified: boolean | null = null; // null = not yet checked (per worker)
-
-function columnsEqual(a: Columns, b: Columns): boolean {
-  for (let i = 0; i < 256; i++) {
-    if (a.names[i] !== b.names[i] || a.heights[i] !== b.heights[i]) return false;
-  }
-  return true;
-}
-
-function resolveColumns(chunk: Chunk, table: ColorTable): Columns | null {
-  if (fastVerified === false) return scanColumns(chunk, table);
-
-  const fast = fastColumns(chunk, table);
-  if (fast === null) return scanColumns(chunk, table); // no/short heightmap, etc.
-  if (fastVerified === true) return fast;
-
-  // First usable fast result: prove it matches the scan before trusting it.
-  const scan = scanColumns(chunk, table);
-  fastVerified = scan !== null && columnsEqual(fast, scan);
-  if (!fastVerified) {
-    console.error('[chunkmap] heightmap fast-path disagreed with block scan; using scan from here on.');
-    return scan ?? fast;
-  }
-  return fast;
-}
-
 // Public entry: resolve surface columns, then sample biomes + water depth.
 export function topColumns(chunk: Chunk, table: ColorTable): ChunkColumns | null {
-  const cols = resolveColumns(chunk, table);
+  const cols = scanColumns(chunk, table);
   if (!cols) return null;
   const { biomes, depths } = sampleExtras(chunk, table, cols.names, cols.heights);
   return { ...cols, biomes, depths };

@@ -107,15 +107,40 @@ This value only drives the mismatch warning, but keep it correct.
 
 If the new version introduces blocks that should be biome-tinted (new leaves,
 plants, etc.) or changes which blocks tint, also update the `TINTS` table in
-[`src/chunkmap.ts`](src/chunkmap.ts).
+[`src/gamedata.ts`](src/gamedata.ts).
+
+If the new version changes a block's **id string** (the registry name — the block
+itself is unchanged, just renamed, e.g. `minecraft:grass` → `minecraft:short_grass`
+in 1.20.3, `minecraft:grass_path` → `minecraft:dirt_path` in 1.17), add the old →
+new id to the `BLOCK_ALIASES` table in [`src/gamedata.ts`](src/gamedata.ts).
+A world last used in an older version of Minecraft can carry an id
+that no longer exists in the current colour table; without an alias it falls back
+to a hashed (often clearly wrong) colour. Worlds pre 1.13 are not supported,
+as the block registry was completely overhauled then and the old ids are gone.
+
+Biome ids get renamed too (the 1.18 "Caves & Cliffs" overhaul renamed and merged
+many — e.g. `minecraft:snowy_tundra` → `minecraft:snowy_plains`, and the old
+`_hills`/`_plateau` sub-biomes folded into their parents). Similar to
+the above `BLOCK_ALIASES` table, the `BIOME_ALIASES` table in
+[`src/gamedata.ts`](src/gamedata.ts) maps each old id to its current one. Without
+it the biome's grass/foliage/water tint won't be found in `biome_colors.json` and
+the block falls back to the no-biome default tint. Merged sub-biomes should point
+at the parent biome they became (its tint is the right one).
+
+Pre-1.18 worlds (1.16–1.17, the oldest the block decoder handles) store biomes as
+a chunk-level *numeric* `Biomes` array rather than the 1.18+ paletted strings, so
+the `LEGACY_BIOME_IDS` table in [`src/gamedata.ts`](src/gamedata.ts) maps those
+numeric registry ids to names (then normalised through `BIOME_ALIASES`). This is
+the 1.16 biome registry and is fixed history — you only touch it if you find a
+wrong/missing id.
 
 The renderer fingerprints its colour inputs into the manifest (the **render
 signature**) and does a full redraw whenever that fingerprint changes — so
 existing maps are redrawn instead of keeping stale tiles. It detects these
 **automatically**: the colour tables (`assets/*.json`), the resolved `MAP_*`
 settings (env value *or* default, from [`src/renderconfig.ts`](src/renderconfig.ts)),
-and the `TINTS` table. So editing tints or a brightness default needs **no**
-version bump.
+and the `TINTS`, `BLOCK_ALIASES`, `BIOME_ALIASES`, and `LEGACY_BIOME_IDS` tables.
+So editing tints, an alias, or a brightness default needs **no** version bump.
 
 The one thing the signature can't see is the coloring **algorithm** itself —
 the shading math, the blur, the water-depth formula, the fallback colour. If you

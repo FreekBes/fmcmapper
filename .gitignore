@@ -1,5 +1,6 @@
 # Dev artifacts
 build/
+output*/
 
 # Dependencies
 node_modules/

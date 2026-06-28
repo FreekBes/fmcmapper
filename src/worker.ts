@@ -5,9 +5,10 @@ import sharp from 'sharp';
 sharp.concurrency(1);
 import { AnvilParser, findChildTag } from 'mc-anvil';
 import {
-  topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, TINTS, EMPTY_HEIGHT,
+  topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, EMPTY_HEIGHT,
 } from './chunkmap';
 import type { BiomeColor } from './chunkmap';
+import { TINTS } from './gamedata';
 import { renderConfig } from './renderconfig';
 
 const SIZE = 512; // one region = 512x512 blocks
@@ -45,7 +46,17 @@ const { brightness: BRIGHTNESS, foliage: FOLIAGE, grass: GRASS, dryFoliage: DRY_
 
 const buf = readFileSync(file);
 const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-const chunks = new AnvilParser(ab).getAllChunks();
+// A valid region starts with an 8 KiB header (location + timestamp tables); a
+// shorter file is empty or truncated (common in worlds, or mid-write) and would
+// make mc-anvil's header parse read past the end. Treat any such failure as an
+// empty region (no chunks) instead of crashing the worker.
+let chunks: ReturnType<AnvilParser['getAllChunks']> = [];
+try {
+  if (ab.byteLength >= 8192) chunks = new AnvilParser(ab).getAllChunks();
+  else console.warn(`[worker] region ${file} is empty or truncated (${ab.byteLength} bytes); skipping`);
+} catch (e) {
+  console.warn(`[worker] could not parse region ${file}; skipping: ${e instanceof Error ? e.message : e}`);
+}
 
 // Open a neighbouring region file as a parser, or null if absent/unreadable.
 function openRegion(path: string): AnvilParser | null {
@@ -86,18 +97,22 @@ const markDirty = (lcx: number, lcz: number): void => {
 let lastUpdate = -1;
 let missing = 0;
 for (const c of chunks) {
-  const t = findChildTag(c.root, x => x.name === 'LastUpdate');
-  let changed = true; // unreadable timestamp -> treat as changed (conservative)
-  if (t && (typeof t.data === 'number' || typeof t.data === 'bigint')) {
-    const v = readLong(t.data);
-    if (v > lastUpdate) lastUpdate = v;
-    changed = v > since;
-  } else {
-    missing++;
-  }
-  if (changed) {
-    const co = c.getChunkCoordinates();
-    if (co) markDirty(co[0] - rx * 32, co[1] - rz * 32);
+  try {
+    const t = findChildTag(c.root, x => x.name === 'LastUpdate');
+    let changed = true; // unreadable timestamp -> treat as changed (conservative)
+    if (t && (typeof t.data === 'number' || typeof t.data === 'bigint')) {
+      const v = readLong(t.data);
+      if (v > lastUpdate) lastUpdate = v;
+      changed = v > since;
+    } else {
+      missing++;
+    }
+    if (changed) {
+      const co = c.getChunkCoordinates();
+      if (co) markDirty(co[0] - rx * 32, co[1] - rz * 32);
+    }
+  } catch {
+    missing++; // corrupt chunk -> force a re-render, but never crash the worker
   }
 }
 const dirtyEdges: [number, number][] = [...dirtyDirs].map(s => {
@@ -181,6 +196,14 @@ const PICK: Record<TintKind, (bc: BiomeColor) => number> = {
   dry_foliage: bc => bc.dryFoliage,
   water: bc => bc.water,
 };
+
+// Fallback tint for biome-tinted blocks when no biome data is available (e.g. a
+// pre-1.18 world, where biomes aren't parsed). Without it those blocks drop to
+// their plain map colour — or, for an id missing from the colour table (1.16's
+// `minecraft:grass` was renamed `short_grass` in 1.20), to a hashed colour that
+// can come out purple. These are Minecraft's no-biome default grass/foliage/water
+// colours; dry-foliage barely appears in such worlds.
+const DEFAULT_TINT: BiomeColor = { grass: 0x91bd59, foliage: 0x48b518, dryFoliage: 0x96a053, water: 0x3f76e4 };
 
 function tintField(grid: (string | null)[], dim: number, pick: (bc: BiomeColor) => number): Field {
   const N = dim * dim;
@@ -296,7 +319,12 @@ async function render(): Promise<void> {
 
   // Pass 1: fill per-region name / biome / depth / height grids.
   for (const chunk of chunks) {
-    const cols = topColumns(chunk, table);
+    let cols;
+    try {
+      cols = topColumns(chunk, table);
+    } catch {
+      continue; // skip a corrupt chunk rather than failing the whole region
+    }
     if (!cols) continue;
     for (let clz = 0; clz < 16; clz++) {
       for (let clx = 0; clx < 16; clx++) {
@@ -344,7 +372,10 @@ async function render(): Promise<void> {
     if (fld.v[ei]) return (fld.r[ei] << 16) | (fld.g[ei] << 8) | fld.b[ei];
     const bn = eb[ei];
     const bc = bn ? biomeColors.get(bn) : undefined;
-    return bc ? PICK[kind](bc) : -1;
+    const c = bc ? PICK[kind](bc) : -1;
+    // No biome (or the biome lacks this tint) -> use the default tint, never the
+    // block's map colour / hashed fallback.
+    return c >= 0 ? c : PICK[kind](DEFAULT_TINT);
   };
 
   const northEdge = northEdgeHeights();
@@ -407,5 +438,14 @@ async function render(): Promise<void> {
   parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(biome), dirtyEdges } as TileResult);
 }
 
-if (!rendered) skip();
-else void render();
+if (!rendered) {
+  skip();
+} else {
+  // Backstop: if rendering the region throws for any reason (corrupt data, an
+  // mc-anvil parser overflow, etc.), skip this region instead of crashing the
+  // worker and aborting the whole map.
+  render().catch((e) => {
+    console.warn(`[worker] failed to render region ${file}; skipping: ${e instanceof Error ? e.message : e}`);
+    skip();
+  });
+}

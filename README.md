@@ -33,6 +33,32 @@ example world you can pan and zoom, no setup required.
 
 ---
 
+## Supported Minecraft versions
+
+The following versions of Minecraft (Java Edition) are supported by fmcmapper:
+
+- 26.2.x
+- 26.1.x
+- 1.21.x
+- 1.20.x
+
+The following versions of Minecraft (Java Edition) are theoretically supported, but have not been tested:
+
+- 1.19.x
+- 1.18.x
+
+The following versions of Minecraft (Java Edition) are supported but have slower rendering and lack biome tinting:
+
+- 1.17.x
+- 1.16.x
+
+Generally the newest version of fmcmapper is backwards compatible with older
+Minecraft versions, so you can use the latest tag/image to render older worlds.
+
+Bedrock Edition versions are **not** supported.
+
+---
+
 ## Beginner: run the whole thing with Docker
 
 This is the easiest path. You'll get **two things running together**:
@@ -360,6 +386,7 @@ pulling the published images — use them while developing:
 | `src/buildtiles.ts`        | Entry point — region discovery, scheduling, tile pyramid. |
 | `src/worker.ts`            | Renders one region to an image (runs in worker threads). |
 | `src/chunkmap.ts`          | Block/biome → colour logic.                              |
+| `src/gamedata.ts`          | Per-version tint rules + block/biome id-rename tables.   |
 | `src/viewer.ts`            | Generates the Leaflet `index.html`.                      |
 | `src/players.ts`           | Live player tracking (RCON poll + WebSocket server).     |
 | `src/biomevector.ts`       | Builds the biome polygons for the hover tooltip layer.   |
