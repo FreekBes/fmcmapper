@@ -66,6 +66,12 @@ export function indexHtml(meta: MapMeta): string {
   var MINZ = ${minZ};     // world block Z of native pixel row 0
   var SPAWN = ${spawn ? JSON.stringify(spawn) : 'null'};
 
+  function isTouchDevice() {
+    return (('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0) ||
+      (navigator.msMaxTouchPoints > 0));
+  }
+
   var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: MAXZOOM + 2 });
 
   L.tileLayer('tiles/{z}/{x}/{y}.png', {
@@ -92,7 +98,7 @@ export function indexHtml(meta: MapMeta): string {
     options: { position: 'bottomleft' },
     onAdd: function () {
       var d = L.DomUtil.create('div', 'coord');
-      d.textContent = 'move the cursor';
+      d.textContent = (isTouchDevice() ? 'Tap' : 'Hover') + ' map to see coordinates + biome';
       this._d = d;
       this._x = null; this._z = null; this._b = '';
       return d;
