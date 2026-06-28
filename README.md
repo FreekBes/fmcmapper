@@ -10,7 +10,8 @@ it up to date as your world grows.
 - 🗺️ Pan and zoom around your whole world in the browser, like Google Maps
 - 🎨 Styled after Minecraft's **in-game map item** — same top-down view, block colours, and height shading
 - 🌳 Biome-accurate grass, foliage, leaf-litter, and water tints
-- 📍 Optional **live player positions** (requires RCON)
+- 📍 Optional **live player positions** (requires multiplayer server + RCON)
+- 🖱️ Display the coordinates + biome when hovering over the map
 - ⚡ Incremental — only re-renders the parts of the world that changed
 - 🔄 Runs continuously, refreshing the map every few minutes
 - 🐳 Ships as a ready-to-run Docker image
@@ -81,7 +82,7 @@ services:
   # The map renderer + web viewer (this project): renders the world and serves
   # the map to your browser on port 8080.
   fmcmapper:
-    image: ghcr.io/freekbes/fmcmapper:26.2
+    image: ghcr.io/freekbes/fmcmapper:26.2  # keep this matching the Minecraft version above
     pull_policy: always
     container_name: fmcmapper
     restart: "unless-stopped"
@@ -153,6 +154,34 @@ fmcmapper only reads the world it produces.
 
 ---
 
+## Beginner: run on singleplayer worlds
+
+Yes, this works with singleplayer worlds too. Follow the steps above, but use
+the following docker-compose file instead of the one above:
+
+```yaml
+services:
+  fmcmapper:
+    image: ghcr.io/freekbes/fmcmapper:latest  # optionally change latest to your Minecraft version
+    pull_policy: always
+    container_name: fmcmapper
+    restart: "unless-stopped"
+    ports:
+      - "8080:80"            # open the map at http://localhost:8080
+    environment:
+      RENDER_INTERVAL: "5"   # re-render every 5 minutes
+    volumes:
+      - "/path/to/your/world":/app/world:ro
+      - "./output":/app/output
+```
+
+You can find the path to your singleplayer world in the Minecraft launcher under
+`Installations → <your profile> → More Options → Game Directory`. The world is
+in `saves/` under that directory. Point the first `volumes` path to it, e.g.
+`"C:\Users\YourName\AppData\Roaming\.minecraft\saves\My World":/app/world:ro`.
+
+---
+
 ## Advanced: configuration & existing servers
 
 ### Use fmcmapper with a server you already run
@@ -163,7 +192,7 @@ world folder on disk. The minimal piece is the `fmcmapper` service:
 ```yaml
 services:
   fmcmapper:
-    image: ghcr.io/freekbes/fmcmapper:26.2
+    image: ghcr.io/freekbes/fmcmapper:26.2  # change 26.2 to your Minecraft version
     pull_policy: always
     ports:
       - "8080:80"                   # the map in your browser
