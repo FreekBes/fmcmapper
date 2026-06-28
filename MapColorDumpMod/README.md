@@ -53,6 +53,12 @@ Bedrock-style look:
 
 ## Running the mod
 
+The **recommended way is the Docker container** below — no JDK or Minecraft
+server of your own required. A prebuilt jar is also shipped at
+`build/libs/mapcolor-dump-x.x.x.jar` if you'd rather run it on your own
+Fabric server ([your own server](#build--run-locally-manual)), and you can rebuild
+it from source with `./gradlew build`.
+
 ### Run with Docker (recommended)
 
 The bundled `Dockerfile` does all of the above unattended — no local JDK needed.
@@ -69,6 +75,11 @@ directory needs to be a volume — the server's `run/` working dir stays inside
 the container. (The mod writes to `MAPCOLOR_OUTPUT_DIR`, which the image sets to
 `/out`.)
 
+### Run on an existing Fabric server
+If you'd rather not use Docker (the simpler route), drop
+`build/libs/mapcolor-dump-x.x.x.jar` (the prebuilt jar shipped in
+this repo — no build step needed) plus the Fabric API jar into a Fabric server's
+`mods/`, start once, and collect both JSON files from the server folder.
 
 ### Build & run locally (manual)
 
@@ -112,7 +123,7 @@ javac --version
    ./gradlew build
    ```
 
-   The mod jar lands in `build/libs/` (use `mapcolor-dump-1.0.0.jar`, not the
+   The mod jar lands in `build/libs/` (use `mapcolor-dump-x.x.x.jar`, not the
    `-sources` jar).
 
 3. **(Optional, for biome grass/foliage/dry-foliage tints) provide the colormap
@@ -156,8 +167,3 @@ javac --version
    ```
 
    Both files land in `run/`: `map_colors.json` and `biome_colors.json`.
-
-   **Alternative — your own server:** drop `build/libs/mapcolor-dump-1.0.0.jar`
-   plus the Fabric API jar into a Fabric server's `mods/`, start once,
-   and collect both JSON files from the server folder. (Running only needs a
-   JRE 25; compiling needs the JDK.)

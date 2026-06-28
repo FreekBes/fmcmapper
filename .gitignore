@@ -1,5 +1,5 @@
 # Dev artifacts
-build/
+/build/
 output*/
 
 # Dependencies
@@ -10,9 +10,16 @@ mcserver/
 */.DS_Store
 .DS_Store
 
-# MapColorDumpMod Gradle / build
+# MapColorDumpMod Gradle / build. Ignore everything under build/ EXCEPT the
+# shipped mod jar (build/libs/mapcolor-dump-*.jar) so it can be distributed
+# directly. A directory excluded with a trailing slash can't have children
+# re-included, so build/ is excluded via /* and libs/ is carved back out.
 MapColorDumpMod/.gradle/
-MapColorDumpMod/build/
+MapColorDumpMod/build/*
+!MapColorDumpMod/build/libs/
+MapColorDumpMod/build/libs/*
+!MapColorDumpMod/build/libs/mapcolor-dump-*.jar
+MapColorDumpMod/build/libs/*-sources.jar
 !MapColorDumpMod/gradle/wrapper/gradle-wrapper.jar
 
 # MapColorDumpMod IDE
