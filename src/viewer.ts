@@ -45,8 +45,8 @@ export function indexHtml(meta: MapMeta): string {
   /* keep block-pixels crisp when zoomed past native zoom (no smoothing) */
   .leaflet-tile{image-rendering:pixelated;image-rendering:-moz-crisp-edges;image-rendering:crisp-edges}
   .coord{background:rgba(0,0,0,.6);color:#eee;font-size:12px;line-height:1.4;padding:4px 8px;border-radius:4px}
-  /* biome polygons are invisible but must still catch the cursor */
-  .biome-region{pointer-events:all}
+  /* biome polygons are invisible but must still catch the cursor, though not with a pointer cursor (inherit cursor instead) */
+  .biome-region{pointer-events:all;cursor:inherit;}
   /* live player name + coords labels (shown on hover) */
   .player-label{background:rgba(0,0,0,.7);color:#fff;border:0;border-radius:1px;corner-shape:notch;box-shadow:none;font-size:11px;line-height:1.3;padding:2px 6px;white-space:nowrap;text-align:center}
   .player-label:before{display:none}
