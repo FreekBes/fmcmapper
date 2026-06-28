@@ -27,6 +27,7 @@ example world you can pan and zoom, no setup required.
 ## Contents
 
 - [Beginner: run the whole thing with Docker](#beginner-run-the-whole-thing-with-docker)
+- [Beginner: run on singleplayer worlds](#beginner-run-on-singleplayer-worlds)
 - [Advanced: configuration & existing servers](#advanced-configuration--existing-servers)
 - [Development: building from source](#development-building-from-source)
 
@@ -171,14 +172,15 @@ services:
     environment:
       RENDER_INTERVAL: "5"   # re-render every 5 minutes
     volumes:
-      - "/path/to/your/world":/app/world:ro
-      - "./output":/app/output
+      - "/path/to/your/world:/app/world:ro"
+      - "./output:/app/output"
 ```
 
 You can find the path to your singleplayer world in the Minecraft launcher under
 `Installations → <your profile> → More Options → Game Directory`. The world is
-in `saves/` under that directory. Point the first `volumes` path to it, e.g.
-`"C:\Users\YourName\AppData\Roaming\.minecraft\saves\My World":/app/world:ro`.
+in `saves/` under that directory. Point the first `volumes` path to it — on
+Windows use **forward slashes** and quote the whole entry, e.g.
+`"C:/Users/YourName/AppData/Roaming/.minecraft/saves/My World:/app/world:ro"`.
 
 ---
 
