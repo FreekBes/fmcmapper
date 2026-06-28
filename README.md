@@ -4,7 +4,7 @@
 Google-Maps-style web map you can open in any browser. It reads the world
 straight from disk, renders a top-down image of every explored area, and keeps
 it up to date as your world grows. And the best part? It works in vanilla Minecraft.
-No modded server needed. Better yet, no need for a server at all - it is even singleplayer-compatible.
+No modded server required. Better yet, no need for a server at all - it is even singleplayer-compatible.
 
 ![The fmcmapper web viewer showing a rendered Minecraft world](assets/fmcmapper.png)
 
@@ -16,15 +16,14 @@ No modded server needed. Better yet, no need for a server at all - it is even si
 - ⚡ Keeps your map up to date by continuously re-rendering only changed regions.
 - 🐳 Ships as a ready-to-run Docker image
 
-**▶ [Try the live demo](https://freekbes.github.io/fmcmapper/)** — a rendered
-example world you can pan and zoom, no setup required.
+**▶ [Try the live demo](https://freekbes.github.io/fmcmapper/)**
 
 ---
 
 ## Contents
 
 - [Supported Minecraft versions](#supported-minecraft-versions)
-- [Beginner: run the whole thing with Docker](#beginner-run-the-whole-thing-with-docker)
+- [Beginner: run on multiplayer worlds](#beginner-run-on-multiplayer-worlds)
 - [Beginner: run on singleplayer worlds](#beginner-run-on-singleplayer-worlds)
 - [Advanced: configuration & existing servers](#advanced-configuration--existing-servers)
 - [Development: building from source](#development-building-from-source)
@@ -57,7 +56,7 @@ The following versions of Minecraft are **not** supported:
 
 ---
 
-## Beginner: run the whole thing with Docker
+## Beginner: run on multiplayer worlds
 
 This is the easiest path. You'll get **two things running together**:
 
@@ -77,7 +76,7 @@ start them all with a single command. That file is already written for you.
 
 Install **Docker Desktop** (Windows/macOS) or **Docker Engine** (Linux) by
 following the official guide: <https://docs.docker.com/get-docker/>. When it's
-working, this command prints a version number:
+working, this terminal command prints a version number:
 
 ```
 docker --version
@@ -100,7 +99,10 @@ services:
     environment:
       EULA: "TRUE"
       TYPE: "VANILLA"
-      VERSION: "26.2"          # keep this matching the fmcmapper tag below
+      VERSION: "26.2"             # keep this matching the fmcmapper tag below
+      ENABLE_RCON: "true"         # RCON is needed for live player positions
+      RCON_PASSWORD: "changeme"   # pick your own
+      RCON_PORT: "25575"
     volumes:
       - ./mcserver:/data
 
@@ -112,9 +114,12 @@ services:
     container_name: fmcmapper
     restart: "unless-stopped"
     ports:
-      - "8080:80"            # open the map at http://localhost:8080
+      - "8080:80"                 # open the map at http://localhost:8080
     environment:
-      RENDER_INTERVAL: "5"   # re-render every 5 minutes
+      RENDER_INTERVAL: "5"        # re-render every 5 minutes
+      RCON_HOST: "mcserver"
+      RCON_PORT: "25575"
+      RCON_PASSWORD: "changeme"   # must match the RCON password above
     volumes:
       - ./mcserver/world:/app/world:ro
       - ./mcserver/fmcmapper:/app/output
@@ -181,7 +186,7 @@ fmcmapper only reads the world it produces.
 
 ## Beginner: run on singleplayer worlds
 
-Yes, this works with singleplayer worlds too. Follow the steps above, but use
+Yes, fmcmapper works with singleplayer worlds too. Follow the steps above, but use
 the following docker-compose file instead of the one above:
 
 ```yaml
@@ -224,15 +229,19 @@ services:
       - "8080:80"                   # the map in your browser
     environment:
       RENDER_INTERVAL: "5"          # re-render every 5 minutes
+      RCON_HOST: "mcserver"         # must match your local server IP/hostname
+      RCON_PORT: "25575"
+      RCON_PASSWORD: "changeme"     # must match the server above
+      # PLAYERS_POLL_INTERVAL: "2"  # seconds between polls (default 2, for large player counts increase this number)
     volumes:
       - /path/to/your/world:/app/world:ro   # your world (read-only)
       - /path/to/output:/app/output         # where the map is written
 ```
 
 That single container renders the world *and* serves the map: a built-in nginx
-hosts the `output` folder on port 80 — with cache revalidation (so the map
+instance hosts the map contents — with cache revalidation (so the map
 refreshes as the world changes without serving stale tiles), gzip, and the
-live-player WebSocket reverse-proxied at `/players`. Just publish the port and
+live-player WebSocket reverse-proxied at `/players`. Just publish port 8080 and
 open `http://localhost:8080`.
 
 > ⚠️ **Match the Minecraft version.** The image tag (`:26.2`) is the Minecraft
@@ -240,38 +249,6 @@ open `http://localhost:8080`.
 > fmcmapper still renders, but some block/biome colours may be slightly off and
 > it prints a warning on startup. Use the image tag that matches your server,
 > or regenerate the colour tables (see [Custom colour tables](#custom-colour-tables)).
-
-### Show live players on the map (optional)
-
-fmcmapper can show online players' **live positions** on the map. When RCON is
-configured, the `fmcmapper` service polls your server over
-[RCON](https://minecraft.wiki/w/RCON) every few seconds (`/list` + each player's `Pos`)
-and serves the positions on a WebSocket; the viewer connects to it automatically
-and shows a labelled dot per player. It's entirely opt-in — with no RCON
-configured nothing runs and the map is unchanged. No extra container needed.
-
-**1. Enable RCON on your Minecraft server.** With itzg/minecraft-server, add to
-the `mcserver` environment:
-
-```yaml
-    environment:
-      ENABLE_RCON: "true"
-      RCON_PASSWORD: "changeme"        # pick your own
-      RCON_PORT: "25575"
-```
-
-**2. Point fmcmapper at RCON.** Add to the existing `fmcmapper` service:
-
-```yaml
-    environment:
-      RCON_HOST: "mcserver"            # must match your local server IP/hostname
-      RCON_PORT: "25575"
-      RCON_PASSWORD: "changeme"        # must match the server above
-      # PLAYERS_POLL_INTERVAL: "2"     # seconds between polls (default 2)
-```
-
-**3. Restart the stack** so fmcmapper picks up the new env vars and the viewer
-starts displaying players.
 
 ### Environment variables
 
@@ -284,9 +261,10 @@ starts displaying players.
 | `TILER_JOBS`      | half your CPU cores    | How many regions to render in parallel.                             |
 | `TILER_FULL`      | `0`                    | Set to `1` to force a full redraw instead of an incremental one.    |
 | `SERVE_ONLY`      | `0`                    | Set to `1` to **only serve** the existing `OUTPUT_PATH` and never render. Lets you keep serving a finished map after deleting the world to save disk; no world is read and live players are off. |
-
-The same values can be passed as command-line arguments instead of env vars:
-`world` `dimension` `output`, e.g. `… /app/world minecraft:the_nether /app/out`.
+| `RCON_HOST`       | *(unset)*              | The host to connect to via RCON to fetch live player locations.     |
+| `RCON_PORT`       | *(unset)*              | The port to connect to via RCON to fetch live player locations.     |
+| `RCON_PASSWORD`   | *(unset)*              | The password used for the RCON connection to fetch live player locations. |
+| `PLAYERS_POLL_INTERVAL` | `2`              | Seconds between polling live player locations to display on the map.|
 
 **Render once instead of continuously** — add the `--once` flag (overrides
 `RENDER_INTERVAL`). Handy for a manual one-off against the running service:
@@ -317,6 +295,8 @@ version (or want exact colours), you can regenerate them with the companion
 **map-color-dump** mod and point fmcmapper at the results with `MAP_COLORS_PATH`
 and `BIOME_COLORS_PATH`. See [`MapColorDumpMod/README.md`](MapColorDumpMod/README.md).
 
+The map-color-dump mod might also be compatible with mods, though I never tried this.
+
 ### Image tags
 
 Images are published to the GitHub Container Registry and tagged by the
@@ -328,11 +308,6 @@ Minecraft version they target:
 
 With `pull_policy: always`, `docker compose up` re-pulls the moving `:26.2` tag,
 so you always get the latest render code without editing anything.
-
-### Health check
-
-The container reports **healthy** once the viewer is online, so other
-services can wait for it (via `depends_on`) before starting.
 
 ---
 
