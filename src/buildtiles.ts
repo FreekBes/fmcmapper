@@ -507,7 +507,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   // Refresh the biome index so the viewer knows which region polygons to load.
   writeBiomeIndex(biomesDir);
 
-  console.log(`done (${incr ? 'incremental' : 'full'}). serve ${outDir}/ over HTTP and open index.html`);
+  console.log(`done ${incr ? 'incremental' : 'full'}) render pass at ${new Date().toISOString()})`);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -564,7 +564,7 @@ async function main(): Promise<void> {
     } catch (e) {
       console.error(`render failed (will retry in ${intervalMin}min):`, e instanceof Error ? e.message : e);
     }
-    console.log(`render pass finished at ${new Date().toISOString()}, sleeping for ${intervalMin}min`);
+    console.log(`render service sleeping for ${intervalMin}min`);
     await sleep(intervalMin * 60000);
   }
 }
