@@ -15,8 +15,8 @@ it up to date as your world grows.
 - 🔄 Runs continuously, refreshing the map every few minutes
 - 🐳 Ships as a ready-to-run Docker image
 
-The map is just static files (images + a web page), served by the small
-ready-to-run **viewer** container that ships with the project.
+The map is just static files (images + a web page) — the single fmcmapper
+container renders them and serves them straight to your browser.
 
 **▶ [Try the live demo](https://freekbes.github.io/fmcmapper/)** — a rendered
 example world you can pan and zoom, no setup required.
@@ -33,11 +33,10 @@ example world you can pan and zoom, no setup required.
 
 ## Beginner: run the whole thing with Docker
 
-This is the easiest path. You'll get **three things running together**:
+This is the easiest path. You'll get **two things running together**:
 
 1. **A Minecraft server** (your game world).
-2. **fmcmapper** — watches the world and renders the map.
-3. **The viewer** — a ready-to-run container that shows the map in your browser at `http://<your-server>:8080`.
+2. **fmcmapper** — watches the world, renders the map, and serves it to your browser at `http://<your-server>:8080`.
 
 You don't need to know any code. You just need Docker.
 
@@ -79,33 +78,22 @@ services:
     volumes:
       - ./mcserver:/data
 
-  # The map renderer (this project).
+  # The map renderer + web viewer (this project): renders the world and serves
+  # the map to your browser on port 8080.
   fmcmapper:
     image: ghcr.io/freekbes/fmcmapper:26.2
     pull_policy: always
     container_name: fmcmapper
     restart: "unless-stopped"
+    ports:
+      - "8080:80"            # open the map at http://localhost:8080
     environment:
-      RENDER_INTERVAL: "5"     # re-render every 5 minutes
+      RENDER_INTERVAL: "5"   # re-render every 5 minutes
     volumes:
       - ./mcserver/world:/app/world:ro
       - ./mcserver/fmcmapper:/app/output
     depends_on:
       mcserver:
-        condition: service_healthy
-
-  # The viewer — a ready-to-run container that serves the map to web browsers.
-  mapserver:
-    image: ghcr.io/freekbes/fmcmapper-viewer:latest
-    pull_policy: always
-    container_name: fmcmapper-server
-    restart: "unless-stopped"
-    ports:
-      - "8080:80"
-    volumes:
-      - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
-    depends_on:
-      fmcmapper:
         condition: service_healthy
 ```
 
@@ -133,8 +121,9 @@ generates a fresh Minecraft world, so give it a minute.
 ### Step 4 — Open the map
 
 Go to **`http://localhost:8080`** in your browser (or `http://<server-ip>:8080`
-if it's running on another machine). You'll see your world; it fills in as the
-server generates and saves chunks.
+if it's running on another machine). Until the first render finishes you'll see a
+"rendering in progress" page that refreshes itself; then the map appears and
+fills in as the server generates and saves chunks.
 
 The map refreshes automatically **every 5 minutes**. To stop everything (run in the same folder as the compose file):
 
@@ -144,11 +133,10 @@ docker compose down
 
 ### What this sets up
 
-| Service     | What it is                          | Port    |
-|-------------|-------------------------------------|---------|
-| `mcserver`  | A vanilla Minecraft server          | `25565` |
-| `fmcmapper` | The map renderer (this project)     | —       |
-| `mapserver` | The viewer that serves the map      | `8080`  |
+| Service     | What it is                                   | Port    |
+|-------------|----------------------------------------------|---------|
+| `mcserver`  | A vanilla Minecraft server                   | `25565` |
+| `fmcmapper` | Renders the map and serves it (this project) | `8080`  |
 
 A `mcserver/` folder appears next to your compose file — that's your world and
 server files. By using this compose file you accept the
@@ -177,6 +165,8 @@ services:
   fmcmapper:
     image: ghcr.io/freekbes/fmcmapper:26.2
     pull_policy: always
+    ports:
+      - "8080:80"                   # the map in your browser
     environment:
       RENDER_INTERVAL: "5"          # re-render every 5 minutes
     volumes:
@@ -184,12 +174,11 @@ services:
       - /path/to/output:/app/output         # where the map is written
 ```
 
-Then serve the `output` folder with the companion
-**`ghcr.io/freekbes/fmcmapper-viewer`** image. It's nginx preconfigured for the
-map: it revalidates caches (so the map refreshes as the world changes without
-serving stale tiles), gzips the GeoJSON, and reverse-proxies the live-player
-WebSocket. Just mount the output at `/usr/share/nginx/html` and publish its port
-— see the `mapserver` service above. It's version-independent, so pin `:latest`.
+That single container renders the world *and* serves the map: a built-in nginx
+hosts the `output` folder on port 80 — with cache revalidation (so the map
+refreshes as the world changes without serving stale tiles), gzip, and the
+live-player WebSocket reverse-proxied at `/players`. Just publish the port and
+open `http://localhost:8080`.
 
 > ⚠️ **Match the Minecraft version.** The image tag (`:26.2`) is the Minecraft
 > version its colours were built for. If your world is a *different* version,
@@ -239,6 +228,7 @@ starts displaying players.
 | `RENDER_INTERVAL` | *(unset)*              | Minutes between renders. **Unset = render once and exit.** Set it to run as a service. |
 | `TILER_JOBS`      | half your CPU cores    | How many regions to render in parallel.                             |
 | `TILER_FULL`      | `0`                    | Set to `1` to force a full redraw instead of an incremental one.    |
+| `SERVE_ONLY`      | `0`                    | Set to `1` to **only serve** the existing `OUTPUT_PATH` and never render. Lets you keep serving a finished map after deleting the world to save disk; no world is read and live players are off. |
 
 The same values can be passed as command-line arguments instead of env vars:
 `world` `dimension` `output`, e.g. `… /app/world minecraft:the_nether /app/out`.
@@ -285,8 +275,8 @@ so you always get the latest render code without editing anything.
 
 ### Health check
 
-The container reports **healthy** once the viewer page exists, so other services
-(like the viewer above) can wait for it before starting.
+The container reports **healthy** once the viewer is online, so other
+services can wait for it (via `depends_on`) before starting.
 
 ---
 
@@ -314,8 +304,8 @@ Two compose files in the repo **build from your local checkout** instead of
 pulling the published images — use them while developing:
 
 - [`docker-compose.dev.yml`](docker-compose.dev.yml) — the full stack (Minecraft
-  server + fmcmapper + viewer), with `fmcmapper` built from this repo's
-  `Dockerfile`. The same beginner setup, but local-built:
+  server + fmcmapper, which renders and serves the map), with `fmcmapper` built
+  from this repo's `Dockerfile`. The same beginner setup, but local-built:
 
   ```
   docker compose -f docker-compose.dev.yml up --build
@@ -332,7 +322,7 @@ pulling the published images — use them while developing:
 
   See [`MapColorDumpMod/README.md`](MapColorDumpMod/README.md) for details.
 
-### Project layout
+### Project structure
 
 | Path                       | What it is                                              |
 |----------------------------|---------------------------------------------------------|
@@ -340,20 +330,15 @@ pulling the published images — use them while developing:
 | `src/worker.ts`            | Renders one region to an image (runs in worker threads). |
 | `src/chunkmap.ts`          | Block/biome → colour logic.                              |
 | `src/viewer.ts`            | Generates the Leaflet `index.html`.                      |
+| `src/players.ts`           | Live player tracking (RCON poll + WebSocket server).     |
+| `src/biomevector.ts`       | Builds the biome polygons for the hover tooltip layer.   |
+| `src/renderconfig.ts`      | Resolves the `MAP_*` appearance env vars and defaults.   |
+| `src/container/`           | Image runtime: nginx config, entrypoint, loading page.   |
+| `Dockerfile`               | Builds the fmcmapper image (renderer + built-in nginx).  |
 | `assets/`                  | Bundled `map_colors.json` / `biome_colors.json`.         |
-| `Dockerfile`               | Builds the fmcmapper image.                              |
 | `MapColorDumpMod/`         | Companion Fabric mod that generates colour tables. [README](MapColorDumpMod/README.md). |
 
-### Continuous integration
+### Contributing
 
-Two GitHub Actions workflows build and push images to GHCR on every push to
-`master`:
-
-- [`build-fmcmapper.yml`](.github/workflows/build-fmcmapper.yml) — the renderer image; runs when renderer files change.
-- [`build-mapcolordump.yml`](.github/workflows/build-mapcolordump.yml) — the mod image; runs only when `MapColorDumpMod/` changes.
-
-Each build tags images with the Minecraft version (from `TARGET_VERSION` in
-`src/buildtiles.ts` / `minecraft_version` in the mod's `gradle.properties`) plus
-a build number, and updates the moving `:<version>` and `:latest` tags. Commit
-message wording doesn't affect the build (versions come from the build number,
-not commit conventions) — only which files changed and the target branch matter.
+To contribute, fork the repo, make your changes, and open a pull request. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for details.

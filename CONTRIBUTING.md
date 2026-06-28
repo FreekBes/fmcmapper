@@ -163,7 +163,7 @@ Check that:
   preferably matching the in-game map item (which should already be the case if
   you used the MapColorDumpMod to generate the color tables).
 - the RCON player position tracking works if you enable it
-  (see [README](README.md#optional-live-player-positions)).
+  (see [README](README.md#show-live-players-on-the-map-optional)).
 
 ## Opening a pull request
 
@@ -191,15 +191,19 @@ before submitting; you're responsible for what you open.
 
 ## Where things live
 
-| Path | What it is |
-|------|------------|
-| `src/buildtiles.ts` | Renderer entry point; `TARGET_VERSION` / `TARGET_DATA_VERSION`, plus `RENDER_VERSION` / `MANIFEST_VERSION`, live here. |
-| `src/chunkmap.ts` | Block/biome → colour logic, including the `TINTS` table. |
-| `src/biomevector.ts` | Generates the biome polygons for a region, used for the tooltip in the map viewer. |
-| `src/worker.ts` | Renders one region (worker thread). |
-| `src/viewer.ts` | Generates the Leaflet map viewer (`index.html`). |
-| `src/players.ts` | Player position tracking logic. |
-| `src/renderconfig.ts` | Resolves the `MAP_*` env vars and defaults. |
-| `assets/*.json` | Generated colour tables (commit regenerated ones). |
-| `MapColorDumpMod/` | The Fabric mod that produces the colour tables. |
-| `.github/workflows/` | CI that builds and pushes the images. |
+See the [project structure](README.md#project-structure) section in the main
+README for a quick overview of the repo layout.
+
+## Continuous integration
+
+Two GitHub Actions workflows build and push images to GHCR on every push to
+`master`:
+
+- [`build-fmcmapper.yml`](.github/workflows/build-fmcmapper.yml) — the renderer image; runs when renderer files change.
+- [`build-mapcolordump.yml`](.github/workflows/build-mapcolordump.yml) — the mod image; runs only when `MapColorDumpMod/` changes.
+
+Each build tags images with the Minecraft version (from `TARGET_VERSION` in
+`src/buildtiles.ts` / `minecraft_version` in the mod's `gradle.properties`) plus
+a build number, and updates the moving `:<version>` and `:latest` tags. Commit
+message wording doesn't affect the build (versions come from the build number,
+not commit conventions) — only which files changed and the target branch matter.

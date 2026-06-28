@@ -20,15 +20,16 @@ services:
       BROADCAST_RCON_TO_OPS: "false"
     volumes:
       - ./mcserver:/data
-    networks:
-      - web       # host-published 25565 + internet access (downloads the server jar)
-      - internal  # RCON port (25575) — reachable by fmcmapper, never the host
 
+  # Renders the world AND serves the map (built-in nginx) — one container, one
+  # port. RCON (25575) stays on the compose network, never published to the host.
   fmcmapper:
     # image: ghcr.io/freekbes/fmcmapper:latest
     build: .
     container_name: fmcmapper
     restart: "unless-stopped"
+    ports:
+      - "8080:80" # the map (live players are proxied at /players on the same port)
     environment:
       RENDER_INTERVAL: "5" # minutes
       # Optional live player tracking over RCON. Without these, it's disabled.
@@ -39,33 +40,6 @@ services:
     volumes:
       - ./mcserver/world:/app/world:ro
       - ./mcserver/fmcmapper:/app/output
-    networks:
-      - internal  # RCON out + player WebSocket (8082) in — no host-published ports
     depends_on:
       mcserver:
         condition: service_healthy
-
-  mapserver:
-    # image: ghcr.io/freekbes/fmcmapper-viewer:latest
-    build: ./viewer
-    container_name: fmcmapper-server
-    restart: "unless-stopped"
-    ports:
-      - "8080:80"
-    volumes:
-      - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
-    networks:
-      - web       # host-published 8080
-      - internal  # reaches fmcmapper's player WebSocket for the /players proxy
-    depends_on:
-      fmcmapper:
-        condition: service_healthy
-
-networks:
-  # Host-facing: only the services with published ports (mapserver 8080, mcserver
-  # 25565) sit here. mcserver also uses it for outbound internet.
-  web: {}
-  # Container-only: RCON and the player WebSocket travel here and are never
-  # published to the host. `internal: true` blocks all traffic in/out of the host.
-  internal:
-    internal: true
