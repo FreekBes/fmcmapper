@@ -32,6 +32,9 @@ COPY README.md ./
 # and OUTPUT_PATH (default ./output)  at runtime,
 # e.g. docker run -e WORLD_PATH=./world -v $PWD/world:/app/world:ro -v $PWD/output:/app/output fmcmapper
 
+# Live player-tracking WebSocket (only active when RCON_HOST/RCON_PORT are set).
+EXPOSE 8082
+
 # Healthy once the viewer page exists (written at the start of the first render).
 # Honors OUTPUT_PATH; resolved relative to WORKDIR when it's a relative path.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=6 \

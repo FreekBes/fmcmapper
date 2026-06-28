@@ -10,12 +10,13 @@ it up to date as your world grows.
 - 🗺️ Pan and zoom around your whole world in the browser, like Google Maps
 - 🎨 Styled after Minecraft's **in-game map item** — same top-down view, block colours, and height shading
 - 🌳 Biome-accurate grass, foliage, leaf-litter, and water tints
-- ⚡ **Incremental** — only re-renders the parts of the world that changed
+- 📍 Optional **live player positions** (requires RCON)
+- ⚡ Incremental — only re-renders the parts of the world that changed
 - 🔄 Runs continuously, refreshing the map every few minutes
 - 🐳 Ships as a ready-to-run Docker image
 
-The map is just static files (images + a web page), so it's cheap to host and
-works behind any web server.
+The map is just static files (images + a web page), served by the small
+ready-to-run **viewer** container that ships with the project.
 
 **▶ [Try the live demo](https://freekbes.github.io/fmcmapper/)** — a rendered
 example world you can pan and zoom, no setup required.
@@ -36,7 +37,7 @@ This is the easiest path. You'll get **three things running together**:
 
 1. **A Minecraft server** (your game world).
 2. **fmcmapper** — watches the world and renders the map.
-3. **A small web server** — shows the map in your browser at `http://<your-server>:8080`.
+3. **The viewer** — a ready-to-run container that shows the map in your browser at `http://<your-server>:8080`.
 
 You don't need to know any code. You just need Docker.
 
@@ -93,7 +94,7 @@ services:
       mcserver:
         condition: service_healthy
 
-  # A tiny web server that serves the map to web browsers.
+  # The viewer — a ready-to-run container that serves the map to web browsers.
   mapserver:
     image: ghcr.io/freekbes/fmcmapper-viewer:latest
     pull_policy: always
@@ -147,7 +148,7 @@ docker compose down
 |-------------|-------------------------------------|---------|
 | `mcserver`  | A vanilla Minecraft server          | `25565` |
 | `fmcmapper` | The map renderer (this project)     | —       |
-| `mapserver` | A web server that shows the map     | `8080`  |
+| `mapserver` | The viewer that serves the map      | `8080`  |
 
 A `mcserver/` folder appears next to your compose file — that's your world and
 server files. By using this compose file you accept the
@@ -183,22 +184,50 @@ services:
       - /path/to/output:/app/output         # where the map is written
 ```
 
-Then serve the `output` folder. The simplest option is the companion
-**`ghcr.io/freekbes/fmcmapper-viewer`** image — nginx preconfigured to revalidate
-caches (so the map refreshes as the world changes) and gzip the GeoJSON; just
-mount the output at `/usr/share/nginx/html`. It's version-independent, so pin
-`:latest`. Any other static web server (Caddy, Apache, even `python -m
-http.server`) works too — it's just static files. Open `index.html`.
-
-> 💡 With a plain static server, set `Cache-Control: no-cache` on the output so
-> browsers revalidate changed tiles instead of serving stale ones. The viewer
-> image does this for you; see [`viewer/default.conf`](viewer/default.conf).
+Then serve the `output` folder with the companion
+**`ghcr.io/freekbes/fmcmapper-viewer`** image. It's nginx preconfigured for the
+map: it revalidates caches (so the map refreshes as the world changes without
+serving stale tiles), gzips the GeoJSON, and reverse-proxies the live-player
+WebSocket. Just mount the output at `/usr/share/nginx/html` and publish its port
+— see the `mapserver` service above. It's version-independent, so pin `:latest`.
 
 > ⚠️ **Match the Minecraft version.** The image tag (`:26.2`) is the Minecraft
 > version its colours were built for. If your world is a *different* version,
 > fmcmapper still renders, but some block/biome colours may be slightly off and
 > it prints a warning on startup. Use the image tag that matches your server,
 > or regenerate the colour tables (see [Custom colour tables](#custom-colour-tables)).
+
+### Show live players on the map (optional)
+
+fmcmapper can show online players' **live positions** on the map. When RCON is
+configured, the `fmcmapper` service polls your server over
+[RCON](https://minecraft.wiki/w/RCON) every few seconds (`/list` + each player's `Pos`)
+and serves the positions on a WebSocket; the viewer connects to it automatically
+and shows a labelled dot per player. It's entirely opt-in — with no RCON
+configured nothing runs and the map is unchanged. No extra container needed.
+
+**1. Enable RCON on your Minecraft server.** With itzg/minecraft-server, add to
+the `mcserver` environment:
+
+```yaml
+    environment:
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "changeme"        # pick your own
+      RCON_PORT: "25575"
+```
+
+**2. Point fmcmapper at RCON.** Add to the existing `fmcmapper` service:
+
+```yaml
+    environment:
+      RCON_HOST: "mcserver"            # must match your local server IP/hostname
+      RCON_PORT: "25575"
+      RCON_PASSWORD: "changeme"        # must match the server above
+      # PLAYERS_POLL_INTERVAL: "2"     # seconds between polls (default 2)
+```
+
+**3. Restart the stack** so fmcmapper picks up the new env vars and the viewer
+starts displaying players.
 
 ### Environment variables
 
@@ -257,7 +286,7 @@ so you always get the latest render code without editing anything.
 ### Health check
 
 The container reports **healthy** once the viewer page exists, so other services
-(like the web server above) can wait for it before starting.
+(like the viewer above) can wait for it before starting.
 
 ---
 
@@ -285,7 +314,7 @@ Two compose files in the repo **build from your local checkout** instead of
 pulling the published images — use them while developing:
 
 - [`docker-compose.dev.yml`](docker-compose.dev.yml) — the full stack (Minecraft
-  server + fmcmapper + web server), with `fmcmapper` built from this repo's
+  server + fmcmapper + viewer), with `fmcmapper` built from this repo's
   `Dockerfile`. The same beginner setup, but local-built:
 
   ```

@@ -149,6 +149,10 @@ to the version you're adding so it generates a world of that version. Then open
 > npm run build
 > WORLD_PATH=/path/to/world OUTPUT_PATH=./output npm start
 > ```
+> Then serve the `output` folder with any static web server, e.g. with Python:
+> ```
+> python -m http.server --directory output 8080
+> ```
 
 Check that:
 
@@ -158,6 +162,8 @@ Check that:
 - any blocks new to the Minecraft version render with sensible colours,
   preferably matching the in-game map item (which should already be the case if
   you used the MapColorDumpMod to generate the color tables).
+- the RCON player position tracking works if you enable it
+  (see [README](README.md#optional-live-player-positions)).
 
 ## Opening a pull request
 
@@ -183,15 +189,6 @@ code should be understandable, the added functionality clearly explained, and
 the PR description should make sense on its own. Review anything an AI generates
 before submitting; you're responsible for what you open.
 
-## Live demo (maintainers)
-
-The [live demo](https://freekbes.github.io/fmcmapper/) is published by the
-[`deploy-pages.yml`](.github/workflows/deploy-pages.yml) workflow, which
-downloads an example world, renders it, and deploys to GitHub Pages — so no
-world or tiles are committed to the repo.
-
-The live demo always uses the latest `master` build and a preconfigured world.
-
 ## Where things live
 
 | Path | What it is |
@@ -201,6 +198,7 @@ The live demo always uses the latest `master` build and a preconfigured world.
 | `src/biomevector.ts` | Generates the biome polygons for a region, used for the tooltip in the map viewer. |
 | `src/worker.ts` | Renders one region (worker thread). |
 | `src/viewer.ts` | Generates the Leaflet map viewer (`index.html`). |
+| `src/players.ts` | Player position tracking logic. |
 | `src/renderconfig.ts` | Resolves the `MAP_*` env vars and defaults. |
 | `assets/*.json` | Generated colour tables (commit regenerated ones). |
 | `MapColorDumpMod/` | The Fabric mod that produces the colour tables. |

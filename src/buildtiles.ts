@@ -14,6 +14,7 @@ import type { TileResult, BiomeCells } from './worker';
 import { buildBiomeGeoJSON, BIOME_NONE, type GeoJSON } from './biomevector';
 import { TINTS } from './chunkmap';
 import { renderConfig } from './renderconfig';
+import { startPlayerTracker } from './players';
 
 const TILE = 512; // Leaflet tileSize; one base tile == one region
 const MANIFEST = 'render-manifest.json';
@@ -528,11 +529,15 @@ async function main(): Promise<void> {
   }
 
   console.log(`service mode: rendering now, then every ${intervalMin}min`);
+  // Live player tracking runs alongside the render loop in this same process —
+  // a no-op (returns null) unless RCON is configured. See players.ts.
+  const stopPlayers = startPlayerTracker();
   // Stop immediately on signal, abandoning any in-progress render — we don't
   // need a complete tile set at all times; the next run picks up where it left
   // off (the manifest is only updated on a fully completed render).
   const onSignal = (sig: string) => {
     console.log(`${sig} received — stopping`);
+    stopPlayers?.();
     process.exit(0);
   };
   process.on('SIGINT', () => onSignal('SIGINT'));

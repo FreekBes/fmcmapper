@@ -14,8 +14,15 @@ services:
       EULA: "TRUE"
       TYPE: "VANILLA"
       VERSION: "${MINECRAFT_VERSION:-LATEST}"
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "changeme"
+      RCON_PORT: "25575"
+      BROADCAST_RCON_TO_OPS: "false"
     volumes:
       - ./mcserver:/data
+    networks:
+      - web       # host-published 25565 + internet access (downloads the server jar)
+      - internal  # RCON port (25575) — reachable by fmcmapper, never the host
 
   fmcmapper:
     # image: ghcr.io/freekbes/fmcmapper:latest
@@ -24,9 +31,16 @@ services:
     restart: "unless-stopped"
     environment:
       RENDER_INTERVAL: "5" # minutes
+      # Optional live player tracking over RCON. Without these, it's disabled.
+      # RCON_HOST: "mcserver"
+      # RCON_PORT: "25575"
+      # RCON_PASSWORD: "changeme" # must match mcserver's RCON_PASSWORD above
+      # PLAYERS_POLL_INTERVAL: "2"       # seconds between polls (default 2)
     volumes:
       - ./mcserver/world:/app/world:ro
       - ./mcserver/fmcmapper:/app/output
+    networks:
+      - internal  # RCON out + player WebSocket (8082) in — no host-published ports
     depends_on:
       mcserver:
         condition: service_healthy
@@ -40,6 +54,18 @@ services:
       - "8080:80"
     volumes:
       - ./mcserver/fmcmapper:/usr/share/nginx/html:ro
+    networks:
+      - web       # host-published 8080
+      - internal  # reaches fmcmapper's player WebSocket for the /players proxy
     depends_on:
       fmcmapper:
         condition: service_healthy
+
+networks:
+  # Host-facing: only the services with published ports (mapserver 8080, mcserver
+  # 25565) sit here. mcserver also uses it for outbound internet.
+  web: {}
+  # Container-only: RCON and the player WebSocket travel here and are never
+  # published to the host. `internal: true` blocks all traffic in/out of the host.
+  internal:
+    internal: true
