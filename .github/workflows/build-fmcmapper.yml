@@ -79,5 +79,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Distinct cache scope per image — the default scope is shared, so two
+          # images building concurrently would clobber each other's GHA cache.
+          cache-from: type=gha,scope=fmcmapper
+          cache-to: type=gha,scope=fmcmapper,mode=max
