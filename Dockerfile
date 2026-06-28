@@ -19,9 +19,8 @@ FROM node:24-bullseye AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-LABEL org.opencontainers.image.source=https://github.com/FreekBes/fmcmapper
-LABEL org.opencontainers.image.description="Renders a Minecraft world into a zoomable, in-game-map-styled web map and serves it over HTTP (built-in nginx). Docs: github.com/FreekBes/fmcmapper"
-LABEL org.opencontainers.image.licenses=MIT
+# OCI labels + annotations (title, description, source, licenses, revision, …) are
+# applied at push time by docker/metadata-action in build-fmcmapper.yml.
 
 # nginx serves the rendered map (and reverse-proxies the player WebSocket) from
 # this same container, so one image and one port cover the whole viewer. Drop the

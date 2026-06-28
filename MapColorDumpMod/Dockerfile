@@ -6,9 +6,8 @@
 # JVM Gradle runs on. eclipse-temurin:25-jdk provides it.
 FROM eclipse-temurin:25-jdk
 
-LABEL org.opencontainers.image.source=https://github.com/FreekBes/fmcmapper/tree/master/MapColorDumpMod
-LABEL org.opencontainers.image.description="Fabric mod that dumps Minecraft's vanilla map + biome colours to JSON for fmcmapper. Docs: github.com/FreekBes/fmcmapper/tree/master/MapColorDumpMod"
-LABEL org.opencontainers.image.licenses=MIT
+# OCI labels + annotations (title, description, source, licenses, revision, …) are
+# applied at push time by docker/metadata-action in build-mapcolordump.yml.
 COPY LICENSE ./
 COPY README.md ./
 

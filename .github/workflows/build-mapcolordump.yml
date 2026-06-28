@@ -24,24 +24,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Tag after the Minecraft version the mod targets (minecraft_version in
-      # gradle.properties). Two tags per build:
-      #   :<mcver>              moving — pull_policy: always picks up new builds
-      #   :<mcver>-<run_number> immutable — distinct per build, for rollback
-      - name: Resolve image and tags
-        id: meta
+      # The mod targets a specific Minecraft version (minecraft_version in
+      # gradle.properties); the image is tagged after it. GHCR image names must be
+      # lowercase, so build the image reference here.
+      - name: Resolve version and image
+        id: ver
         run: |
           ver="$(grep -oP '^minecraft_version=\K.*' MapColorDumpMod/gradle.properties | tr -d '[:space:]')"
           [ -n "$ver" ] || { echo "could not read minecraft_version from gradle.properties" >&2; exit 1; }
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/mapcolor-dump"
-          echo "Building $image for Minecraft $ver (build $GITHUB_RUN_NUMBER)"
-          {
-            echo "tags<<EOF"
-            echo "${image}:latest"
-            echo "${image}:${ver}"
-            echo "${image}:${ver}-${GITHUB_RUN_NUMBER}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/mapcolor-dump" >> "$GITHUB_OUTPUT"
+
+      # Single source for OCI labels AND annotations. created / revision / licenses
+      # are filled in automatically; we override title / description / source /
+      # version. Annotations are emitted at the image index level, where GHCR reads
+      # the package description.
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+        with:
+          images: ${{ steps.ver.outputs.image }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.ver.outputs.version }}
+            type=raw,value=${{ steps.ver.outputs.version }}-${{ github.run_number }}
+          labels: |
+            org.opencontainers.image.title=fmcmapper map-color-dump
+            org.opencontainers.image.description=Modded Minecraft server that dumps Minecraft's vanilla map + biome colours to JSON for the fmcmapper project and then exits. Docs: github.com/FreekBes/fmcmapper/tree/master/MapColorDumpMod
+            org.opencontainers.image.source=https://github.com/FreekBes/fmcmapper/tree/master/MapColorDumpMod
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -57,5 +71,7 @@ jobs:
           file: ./MapColorDumpMod/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

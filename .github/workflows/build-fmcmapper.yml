@@ -30,24 +30,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Tag after the Minecraft version this renderer targets (TARGET_VERSION in
-      # buildtiles.ts). Two tags per build:
-      #   :<mcver>              moving — compose pins this with pull_policy: always
-      #   :<mcver>-<run_number> immutable — distinct per build, for rollback
-      - name: Resolve image and tags
-        id: meta
+      # The renderer targets a specific Minecraft version (TARGET_VERSION in
+      # buildtiles.ts); the image is tagged after it. GHCR image names must be
+      # lowercase, so build the image reference here.
+      - name: Resolve version and image
+        id: ver
         run: |
           ver="$(grep -oP "TARGET_VERSION = '\K[^']+" src/buildtiles.ts)"
           [ -n "$ver" ] || { echo "could not read TARGET_VERSION from src/buildtiles.ts" >&2; exit 1; }
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fmcmapper"
-          echo "Building $image for Minecraft $ver (build $GITHUB_RUN_NUMBER)"
-          {
-            echo "tags<<EOF"
-            echo "${image}:latest"
-            echo "${image}:${ver}"
-            echo "${image}:${ver}-${GITHUB_RUN_NUMBER}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fmcmapper" >> "$GITHUB_OUTPUT"
+
+      # Single source for OCI labels AND annotations. created / revision / source /
+      # licenses are filled in automatically; we override title / description /
+      # version. Tags: moving :latest and :<mcver>, plus an immutable
+      # :<mcver>-<run_number> for rollback. Annotations are emitted at the image
+      # index level, which is where GHCR reads the package description.
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+        with:
+          images: ${{ steps.ver.outputs.image }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.ver.outputs.version }}
+            type=raw,value=${{ steps.ver.outputs.version }}-${{ github.run_number }}
+          labels: |
+            org.opencontainers.image.title=fmcmapper
+            org.opencontainers.image.description=Renders a Minecraft world into an in-game-map-styled web map and serves it over HTTP (built-in nginx). Docs: github.com/FreekBes/fmcmapper
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -63,5 +77,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
