@@ -143,6 +143,37 @@ export function indexHtml(meta: MapMeta): string {
     if (biomeCache[id] && biomeGroup.hasLayer(biomeCache[id])) biomeGroup.removeLayer(biomeCache[id]);
   }
 
+  // Which biome is at a given map point. A player head sits above the biome
+  // polygons and blocks their hover, so the head looks the biome up by position
+  // instead — that also works on touch, where there's no hover at all. Coords are
+  // the GeoJSON [lng, lat] the loaded features already use (= a LatLng's lng/lat).
+  function pointInRing(x, y, ring) {
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  function biomeAt(latlng) {
+    var x = latlng.lng, y = latlng.lat, hit = null;
+    for (var id in biomeCache) {
+      if (!biomeGroup.hasLayer(biomeCache[id])) continue;
+      biomeCache[id].eachLayer(function (sub) {
+        if (hit || !sub.feature || sub.feature.geometry.type !== 'MultiPolygon') return;
+        var polys = sub.feature.geometry.coordinates; // [ [outer, hole...], ... ]
+        for (var p = 0; p < polys.length; p++) {
+          if (!pointInRing(x, y, polys[p][0])) continue;
+          var inHole = false;
+          for (var h = 1; h < polys[p].length; h++) if (pointInRing(x, y, polys[p][h])) { inHole = true; break; }
+          if (!inHole) { hit = sub.feature.properties.biome; return; }
+        }
+      });
+      if (hit) break;
+    }
+    return hit;
+  }
+
   var BiomeGrid = L.GridLayer.extend({
     createTile: function (coords, done) {
       var tile = document.createElement('div'); // invisible placeholder; data lives in biomeGroup
@@ -286,6 +317,12 @@ export function indexHtml(meta: MapMeta): string {
         var m = L.marker(ll, { icon: headIcon(p.name), keyboard: false });
         // Hover the head to reveal the name + coords (tooltip is not permanent).
         m.bindTooltip(playerLabel(p), { direction: 'top', offset: [0, -headPx() / 2], className: 'player-label' });
+        // The head covers the biome polygons, so report the biome at its own
+        // position. 'click' covers touch, where there's no hover.
+        var showBiome = function () { var bn = biomeAt(this.getLatLng()); coords.biome(bn ? prettyBiome(bn) : ''); };
+        m.on('mouseover', showBiome);
+        m.on('click', showBiome);
+        m.on('mouseout', function () { coords.biome(''); });
         m.addTo(playerGroup);
         playerMarkers[p.name] = m;
       }
