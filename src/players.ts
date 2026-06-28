@@ -166,7 +166,14 @@ export function startPlayerTracker(): (() => void) | null {
 
   const rcon = new RconClient();
   rcon.ensureConnected();
-  const timer = setInterval(() => { void poll(rcon, emit); }, POLL_MS);
+  // Skip a tick if the previous poll is still running (slow/large server), so
+  // commands can't pile up and overlap — each cycle is N+1 RCON commands.
+  let polling = false;
+  const timer = setInterval(() => {
+    if (polling) return;
+    polling = true;
+    void poll(rcon, emit).finally(() => { polling = false; });
+  }, POLL_MS);
   console.log(`[players] polling ${process.env.RCON_HOST}:${process.env.RCON_PORT} every ${POLL_MS / 1000}s`);
 
   return () => {
