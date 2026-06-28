@@ -33,9 +33,9 @@ services:
     environment:
       RENDER_INTERVAL: "5" # minutes
       # Optional live player tracking over RCON. Without these, it's disabled.
-      # RCON_HOST: "mcserver"
-      # RCON_PORT: "25575"
-      # RCON_PASSWORD: "changeme" # must match mcserver's RCON_PASSWORD above
+      RCON_HOST: "mcserver"
+      RCON_PORT: "25575"
+      RCON_PASSWORD: "changeme" # must match mcserver's RCON_PASSWORD above
       # PLAYERS_POLL_INTERVAL: "2"       # seconds between polls (default 2)
     volumes:
       - ./mcserver/world:/app/world:ro
