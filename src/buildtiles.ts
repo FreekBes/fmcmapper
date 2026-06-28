@@ -12,7 +12,7 @@ import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
 import type { TileResult, BiomeCells } from './worker';
 import { buildBiomeGeoJSON, BIOME_NONE, type GeoJSON } from './biomevector';
-import { TINTS, BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS } from './gamedata';
+import { TINTS, BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS, SUBMERGED_PLANTS } from './gamedata';
 import { renderConfig } from './renderconfig';
 import { startPlayerTracker } from './players';
 
@@ -25,7 +25,7 @@ const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
 // captured by the colour-table, render-config, or TINTS hashes below. (Changing
 // a colour table, a MAP_* setting/default, or which blocks tint is detected
 // automatically, so those don't need a bump.)
-const RENDER_VERSION = 5;
+const RENDER_VERSION = 6;
 
 // Colour tables whose contents feed the render signature (resolved like the worker).
 const MAP_COLORS_PATH = process.env.MAP_COLORS_PATH ?? resolve(process.cwd(), 'assets/map_colors.json');
@@ -44,6 +44,7 @@ function renderSignature(): string {
   h.update('\0aliases=' + JSON.stringify(BLOCK_ALIASES));
   h.update('\0biomealiases=' + JSON.stringify(BIOME_ALIASES));
   h.update('\0legacybiomes=' + JSON.stringify(LEGACY_BIOME_IDS));
+  h.update('\0submerged=' + JSON.stringify([...SUBMERGED_PLANTS]));
   return h.digest('hex').slice(0, 16);
 }
 

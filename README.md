@@ -386,7 +386,7 @@ pulling the published images — use them while developing:
 | `src/buildtiles.ts`        | Entry point — region discovery, scheduling, tile pyramid. |
 | `src/worker.ts`            | Renders one region to an image (runs in worker threads). |
 | `src/chunkmap.ts`          | Block/biome → colour logic.                              |
-| `src/gamedata.ts`          | Per-version tint rules + block/biome id-rename tables.   |
+| `src/gamedata.ts`          | Tinting rules + block/biome id-rename tables.            |
 | `src/viewer.ts`            | Generates the Leaflet `index.html`.                      |
 | `src/players.ts`           | Live player tracking (RCON poll + WebSocket server).     |
 | `src/biomevector.ts`       | Builds the biome polygons for the hover tooltip layer.   |

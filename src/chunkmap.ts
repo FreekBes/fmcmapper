@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { Chunk, BlockDataParser, chunkCoordinateFromIndex, findChildTagAtPath } from 'mc-anvil';
 import type { TagData, BlockStates, Palette } from 'mc-anvil';
-import { BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS } from './gamedata';
+import { BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS, SUBMERGED_PLANTS } from './gamedata';
 
 // ---------------------------------------------------------------------------
 // Vanilla map-color palette (from the Fabric map-color-dump mod)
@@ -188,8 +188,21 @@ const paletteBits = (n: number): number => Math.floor(Math.log2((n - 1) || 1)) +
 type SectionReader = {
   palNames: string[];
   palDrawable: boolean[];
+  palSubmerged: boolean[]; // counts as water for depth shading (see submergedFlags)
   idxAt: (lx: number, ly: number, lz: number) => number; // palette index, or -1
 };
+
+const entryWaterlogged = (entry: TagData[]): boolean => {
+  const props = entry.find(x => x.name === 'Properties');
+  const list = props && Array.isArray(props.data) ? (props.data as TagData[]) : null;
+  return list?.find(x => x.name === 'waterlogged')?.data === 'true';
+};
+
+// Per palette entry: does this block carry water (so a depth scan keeps going)?
+// Water itself, blocks with waterlogged=true (corals, sea pickles, waterlogged
+// stairs/slabs in ruins), and the implicitly-submerged plants above.
+const submergedFlags = (entries: TagData[][], names: string[]): boolean[] =>
+  entries.map((e, i) => names[i] === 'minecraft:water' || SUBMERGED_PLANTS.has(names[i]) || entryWaterlogged(e));
 
 function buildReader(section: TagData[], table: ColorTable): SectionReader | null {
   const { bs, pal } = sectionData(section);
@@ -197,18 +210,19 @@ function buildReader(section: TagData[], table: ColorTable): SectionReader | nul
   const entries = pal.data.data as TagData[][];
   const palNames = entries.map(paletteEntryName);
   const palDrawable = palNames.map(nm => drawable(nm, table));
+  const palSubmerged = submergedFlags(entries, palNames);
 
   if (entries.length <= 1) {
     // Uniform section: one block fills it (or it's empty/air).
     if (entries.length === 0 || !palDrawable[0]) return null;
-    return { palNames, palDrawable, idxAt: () => 0 };
+    return { palNames, palDrawable, palSubmerged, idxAt: () => 0 };
   }
   if (!bs || !(bs.data instanceof ArrayBuffer) || bs.data.byteLength === 0) return null;
 
   const bits = Math.max(4, paletteBits(entries.length)); // blocks: min 4 bits
   const read = packedExtractor(bs.data, bits);
   const idxAt = (lx: number, ly: number, lz: number): number => read(ly * 256 + lz * 16 + lx);
-  return { palNames, palDrawable, idxAt };
+  return { palNames, palDrawable, palSubmerged, idxAt };
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +348,8 @@ function sampleExtras(
   let legacyBiome: BiomeReader | null | undefined;
 
   for (let c = 0; c < 256; c++) {
-    if (names[c] === null) continue;
+    const nm = names[c];
+    if (nm === null) continue;
     const wy = heights[c];
     if (wy === EMPTY_HEIGHT) continue;
     const lx = c % 16;
@@ -349,15 +364,20 @@ function sampleExtras(
       if (legacyBiome) biomes[c] = legacyBiome.biomeAt(lx, wy, lz); // legacy: world Y
     }
 
-    // Water depth: number of water blocks downward from the surface.
-    if (names[c] === WATER) {
+    // Water depth: blocks of water column downward from the surface. Like vanilla
+    // (which counts by fluid state), this sees through waterlogged blocks and
+    // submerged plants — otherwise kelp/seagrass would stop it short and report
+    // deep ocean as shallow (speckled bright pixels). Submerged plants that are
+    // themselves the surface (e.g. kelp at sea level) render as water too, so they
+    // need a depth as well.
+    if (nm === WATER || SUBMERGED_PLANTS.has(nm)) {
       let depth = 0;
       for (let y = wy; y >= minY && depth < WATER_DEPTH_CAP; y--) {
         const sy = Math.floor(y / 16);
         const rdr = getBlock(sy);
         if (!rdr) break;
         const idx = rdr.idxAt(lx, y - sy * 16, lz);
-        if (idx < 0 || rdr.palNames[idx] !== WATER) break;
+        if (idx < 0 || !rdr.palSubmerged[idx]) break;
         depth++;
       }
       depths[c] = depth;

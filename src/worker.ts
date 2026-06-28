@@ -388,22 +388,23 @@ async function render(): Promise<void> {
       const nm = name[idx];
       if (nm === null) continue;
 
-      // Vanilla shading: compare against the block to the NORTH (-Z = up on the
-      // tile). At the region's north edge the neighbour lives in the region above,
-      // whose south-edge heights we loaded into northEdge so the seam matches.
-      let shadeIndex = 1;
-      const hN = lz > 0 ? height[(lz - 1) * SIZE + lx] : northEdge[lx];
-      if (hN !== EMPTY_HEIGHT) {
-        const h = height[idx];
-        shadeIndex = h > hN ? 2 : h < hN ? 0 : 1;
-      }
-
       const tint = TINTS[nm];
-      // Water is shaded by depth (shallow bright -> deep dark), with a 1px
-      // checkerboard dither, like the vanilla map. Overrides the height shade.
+      let shadeIndex = 1;
       if (tint === 'water') {
+        // Water is shaded by depth (shallow bright -> deep dark) with a 1px
+        // checkerboard dither, like the vanilla map — not by the north height,
+        // so skip that comparison entirely.
         const d0 = depth[idx] * 0.1 + ((lx + lz) & 1) * 0.2;
         shadeIndex = d0 < 0.5 ? 2 : d0 > 0.9 ? 0 : 1;
+      } else {
+        // Vanilla shading: compare against the block to the NORTH (-Z = up on the
+        // tile). At the region's north edge the neighbour lives in the region above,
+        // whose south-edge heights we loaded into northEdge so the seam matches.
+        const hN = lz > 0 ? height[(lz - 1) * SIZE + lx] : northEdge[lx];
+        if (hN !== EMPTY_HEIGHT) {
+          const h = height[idx];
+          shadeIndex = h > hN ? 2 : h < hN ? 0 : 1;
+        }
       }
       // Leaf blocks (foliage tint, or fixed birch/spruce) get extra darkening.
       const isLeaf = tint === 'foliage' || typeof tint === 'number';

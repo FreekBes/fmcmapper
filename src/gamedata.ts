@@ -5,6 +5,18 @@
 // editing one here forces a redraw automatically — no version bump required.
 // ---------------------------------------------------------------------------
 
+// Always-submerged plants (no `waterlogged` property — they're implicitly in
+// water). The water-depth scan treats these, plus any waterlogged block, as part
+// of the water column — matching vanilla, which measures depth by fluid state.
+// Without it the scan stops at e.g. a kelp stalk and reports deep ocean as
+// shallow (speckled bright pixels).
+export const SUBMERGED_PLANTS = new Set([
+  'minecraft:kelp', 'minecraft:kelp_plant',
+  'minecraft:seagrass', 'minecraft:tall_seagrass',
+  'minecraft:bubble_column',
+]);
+
+
 // How a block is colored: by biome grass/foliage/dry-foliage/water tint, a fixed
 // RGB (leaves with a constant color), or — if absent here — its plain map color.
 export type Tint = 'grass' | 'foliage' | 'dry_foliage' | 'water' | number;
@@ -32,6 +44,12 @@ export const TINTS: Record<string, Tint> = {
   'minecraft:spruce_leaves': 0x619961,
   // Other leaves, such as azalea, cherry and pale oak don't get tinted at all
   // and feature the same color regardless of the biome.
+
+  // Submerged plants are always tinted as water.
+  ...Array.from(SUBMERGED_PLANTS).reduce((acc, id) => {
+    acc[id] = 'water';
+    return acc;
+  }, {} as Record<string, Tint>),
 };
 
 // Blocks Mojang renamed *after* the 1.13 flattening. A world keeps whatever id it
@@ -93,7 +111,6 @@ export const BIOME_ALIASES: Record<string, string> = {
   'minecraft:swamp_hills': 'minecraft:swamp',
   'minecraft:mushroom_field_shore': 'minecraft:mushroom_fields',
 };
-
 // Numeric biome ids -> namespaced name, for pre-1.18 worlds. Before the 1.18
 // paletted per-section `biomes` container, biomes were a chunk-level numeric
 // `Biomes` array keyed by these registry ids. Only 1.16-1.17 worlds actually

@@ -134,13 +134,22 @@ numeric registry ids to names (then normalised through `BIOME_ALIASES`). This is
 the 1.16 biome registry and is fixed history — you only touch it if you find a
 wrong/missing id.
 
+Water depth (which drives water shading) is measured by counting the water column
+down to the seabed. Like vanilla, the scan sees through waterlogged blocks and the
+always-submerged plants listed in `SUBMERGED_PLANTS` in
+[`src/gamedata.ts`](src/gamedata.ts) — without it, kelp/seagrass stop the scan
+short and deep ocean renders as speckled bright pixels. If a new version adds an
+implicitly-submerged plant (one carrying water with no `waterlogged` property), add
+it there.
+
 The renderer fingerprints its colour inputs into the manifest (the **render
 signature**) and does a full redraw whenever that fingerprint changes — so
 existing maps are redrawn instead of keeping stale tiles. It detects these
 **automatically**: the colour tables (`assets/*.json`), the resolved `MAP_*`
 settings (env value *or* default, from [`src/renderconfig.ts`](src/renderconfig.ts)),
-and the `TINTS`, `BLOCK_ALIASES`, `BIOME_ALIASES`, and `LEGACY_BIOME_IDS` tables.
-So editing tints, an alias, or a brightness default needs **no** version bump.
+and the `TINTS`, `BLOCK_ALIASES`, `BIOME_ALIASES`, `LEGACY_BIOME_IDS`, and
+`SUBMERGED_PLANTS` tables. So editing tints, an alias, or a brightness default
+needs **no** version bump.
 
 The one thing the signature can't see is the coloring **algorithm** itself —
 the shading math, the blur, the water-depth formula, the fallback colour. If you
