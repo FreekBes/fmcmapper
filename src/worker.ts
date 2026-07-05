@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 import sharp from 'sharp';
 sharp.concurrency(1);
 sharp.cache(false); // don't retain decoded pixels in libvips' native cache
-import { AnvilParser, findChildTag } from 'mc-anvil';
+import { AnvilParser, Chunk, NBTParser, findChildTag } from 'mc-anvil';
 import {
   topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, EMPTY_HEIGHT,
 } from './chunkmap';
@@ -51,12 +51,32 @@ const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 // shorter file is empty or truncated (common in worlds, or mid-write) and would
 // make mc-anvil's header parse read past the end. Treat any such failure as an
 // empty region (no chunks) instead of crashing the worker.
-let chunks: ReturnType<AnvilParser['getAllChunks']> = [];
+let parser: AnvilParser | null = null;
 try {
-  if (ab.byteLength >= 8192) chunks = new AnvilParser(ab).getAllChunks();
+  if (ab.byteLength >= 8192) parser = new AnvilParser(ab);
   else console.warn(`[worker] region ${file} is empty or truncated (${ab.byteLength} bytes); skipping`);
 } catch (e) {
   console.warn(`[worker] could not parse region ${file}; skipping: ${e instanceof Error ? e.message : e}`);
+}
+
+// Decode chunks one at a time instead of materialising all ~1024 at once
+// (mc-anvil's getAllChunks). A region's full decompressed NBT is by far the
+// worker's largest allocation — holding every chunk tree simultaneously can run
+// to hundreds of MB for a dense region — but each pass only ever needs the chunk
+// in hand, so a generator lets each tree be GC'd as the loop moves on. This
+// mirrors getAllChunks' own decode (locate -> inflate -> parse) per chunk, and
+// skips a corrupt chunk rather than aborting the whole region.
+function* iterChunks(): Generator<Chunk> {
+  if (!parser) return;
+  let entries;
+  try { entries = parser.getLocationEntries(); } catch { return; }
+  for (const e of entries) {
+    if (e.sectorCount === 0) continue;
+    let chunk: Chunk;
+    try { chunk = new Chunk(new NBTParser(parser.getChunkData(e.offset)).getTag()); }
+    catch { continue; }
+    yield chunk;
+  }
 }
 
 // Open a neighbouring region file as a parser, or null if absent/unreadable.
@@ -97,7 +117,7 @@ const markDirty = (lcx: number, lcz: number): void => {
 };
 let lastUpdate = -1;
 let missing = 0;
-for (const c of chunks) {
+for (const c of iterChunks()) {
   try {
     const t = findChildTag(c.root, x => x.name === 'LastUpdate');
     let changed = true; // unreadable timestamp -> treat as changed (conservative)
@@ -323,8 +343,10 @@ async function render(): Promise<void> {
   const height = new Int32Array(SIZE * SIZE).fill(EMPTY_HEIGHT);
   let any = false;
 
-  // Pass 1: fill per-region name / biome / depth / height grids.
-  for (const chunk of chunks) {
+  // Pass 1: fill per-region name / biome / depth / height grids. Re-iterates the
+  // chunks (the earlier LastUpdate scan already consumed one pass); only regions
+  // that actually re-render pay this second decode.
+  for (const chunk of iterChunks()) {
     let cols;
     try {
       cols = topColumns(chunk, table);
