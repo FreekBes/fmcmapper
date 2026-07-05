@@ -21,7 +21,10 @@ export function playersEnabled(): boolean {
   return !!(process.env.RCON_HOST && process.env.RCON_PORT);
 }
 
-type Player = { name: string; x: number; y: number; z: number };
+// `dimension` is the player's current dimension id (e.g. minecraft:overworld).
+// Every online player is sent regardless of dimension; the viewer shows only the
+// ones matching the map's dimension (so a nether map doesn't show overworld players).
+type Player = { name: string; x: number; y: number; z: number; dimension: string };
 type Snapshot = { type: 'players'; t: number; players: Player[] };
 
 // --- response parsing -------------------------------------------------------
@@ -43,11 +46,18 @@ function parsePos(resp: string): [number, number, number] | null {
   return [n[0], n[1], n[2]];
 }
 
+// `data get entity <name> Dimension` -> '<name> has the following entity data:
+// "minecraft:the_nether"'. The dimension is a quoted resource-location string.
+function parseDimension(resp: string): string | null {
+  const m = /"([^"]+)"/.exec(resp);
+  return m ? m[1] : null;
+}
+
 // --- RCON client with a FIFO command queue ----------------------------------
 // node-rcon multiplexes every command's reply through one 'response' event;
 // because RCON runs over a single ordered TCP socket, replies come back in send
 // order, so a queue of resolvers paired 1:1 with sends correlates them. (Replies
-// larger than one packet would break this, but `list` / `Pos` are tiny.)
+// larger than one packet would break this, but `list` / `Pos` / `Dimension` are tiny.)
 class RconClient {
   private client: Rcon | null = null;
   private authed = false;
@@ -129,7 +139,12 @@ async function poll(rcon: RconClient, emit: (s: Snapshot) => void): Promise<void
   for (const name of names) {
     try {
       const pos = parsePos(await rcon.cmd(`data get entity ${name} Pos`));
-      if (pos) players.push({ name, x: pos[0], y: pos[1], z: pos[2] });
+      if (!pos) continue;
+      let dimension = '';
+      try {
+        dimension = parseDimension(await rcon.cmd(`data get entity ${name} Dimension`)) ?? '';
+      } catch { /* couldn't read dimension — leave unknown; the viewer shows it anyway */ }
+      players.push({ name, x: pos[0], y: pos[1], z: pos[2], dimension });
     } catch { /* player left, or transient error — skip them this tick */ }
   }
   emit({ type: 'players', t: Date.now(), players });
@@ -167,7 +182,7 @@ export function startPlayerTracker(): (() => void) | null {
   const rcon = new RconClient();
   rcon.ensureConnected();
   // Skip a tick if the previous poll is still running (slow/large server), so
-  // commands can't pile up and overlap — each cycle is N+1 RCON commands.
+  // commands can't pile up and overlap — each cycle is 2N+1 RCON commands.
   let polling = false;
   const timer = setInterval(() => {
     if (polling) return;

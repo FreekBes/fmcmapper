@@ -23,6 +23,11 @@ export function indexHtml(meta: MapMeta): string {
   const biomeTile = tileSize * (meta.biomeSuper ?? 1); // GridLayer tile = 1 biome super-tile
   const initialZoom = Math.max(0, maxZoom - 2);
   const title = meta.dimension ? `${meta.dimension} map` : 'Dimension map';
+  // Namespaced dimension id this map renders, used to filter live players to the
+  // matching dimension. Default + normalise a bare id (e.g. "overworld") so it
+  // compares equal to what the server reports (always "minecraft:overworld").
+  const rawDim = meta.dimension ?? 'minecraft:overworld';
+  const dimension = rawDim.includes(':') ? rawDim : `minecraft:${rawDim}`;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -65,6 +70,7 @@ export function indexHtml(meta: MapMeta): string {
   var MINX = ${minX};     // world block X of native pixel column 0
   var MINZ = ${minZ};     // world block Z of native pixel row 0
   var SPAWN = ${spawn ? JSON.stringify(spawn) : 'null'};
+  var DIMENSION = ${JSON.stringify(dimension)};  // only show live players in this dimension
 
   function isTouchDevice() {
     return (('ontouchstart' in window) ||
@@ -314,6 +320,9 @@ export function indexHtml(meta: MapMeta): string {
     for (var i = 0; i < list.length; i++) {
       var p = list[i];
       if (typeof p.x !== 'number' || typeof p.z !== 'number') continue;
+      // Only show players in this map's dimension. Unknown dimension (server too
+      // old to report it, or a parse miss) falls open — show rather than hide.
+      if (p.dimension && p.dimension !== DIMENSION) continue;
       seen[p.name] = true;
       var ll = fromBlock(p.x, p.z);
       if (playerMarkers[p.name]) {
