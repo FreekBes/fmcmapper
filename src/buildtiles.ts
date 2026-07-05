@@ -187,18 +187,69 @@ function readLevel(worldPath: string): {
 }
 
 // --- worker pool ------------------------------------------------------------
-function runWorker(job: Job): Promise<TileResult> {
-  return new Promise((resolve, reject) => {
-    const w = new Worker(join(__dirname, 'worker.js'), { workerData: job });
-    w.once('message', (msg: TileResult) => {
-      resolve(msg);
-      void w.terminate();
-    });
-    w.once('error', (err) => {
-      void w.terminate(); // otherwise a failed worker's thread + heap leaks each pass
-      reject(err);
-    });
-  });
+// A fixed set of persistent workers, fed one region job at a time. Reusing the
+// threads (instead of spawning + terminating a Worker per region) avoids the
+// per-region isolate spin-up and re-parsing the colour tables in every worker for
+// every region — the worker loads those once at startup and handles many jobs.
+class WorkerPool {
+  private readonly script = join(__dirname, 'worker.js');
+  private readonly all = new Set<Worker>();
+  private readonly idle: Worker[] = [];
+  private readonly waiters: ((w: Worker) => void)[] = [];
+
+  constructor(size: number) {
+    for (let i = 0; i < size; i++) this.idle.push(this.spawn());
+  }
+
+  private spawn(): Worker {
+    const w = new Worker(this.script);
+    this.all.add(w);
+    return w;
+  }
+
+  // Hand an idle worker to the next waiter, or park it until one asks.
+  private release(w: Worker): void {
+    const next = this.waiters.shift();
+    if (next) next(w);
+    else this.idle.push(w);
+  }
+
+  // A worker died mid-job: drop it and spin up a replacement so the pool keeps
+  // its size (and its concurrency) for the rest of the run.
+  private retire(w: Worker): void {
+    this.all.delete(w);
+    void w.terminate();
+    this.release(this.spawn());
+  }
+
+  private acquire(): Promise<Worker> {
+    const w = this.idle.pop();
+    return w ? Promise.resolve(w) : new Promise<Worker>(res => this.waiters.push(res));
+  }
+
+  // Render one region on the next free worker. Resolves with its tile result;
+  // rejects only if the worker itself crashes (processJob turns render failures
+  // into a "skipped" result rather than throwing).
+  run(job: Job): Promise<TileResult> {
+    return this.acquire().then(w => new Promise<TileResult>((resolve, reject) => {
+      const done = (): void => { w.off('message', onMsg); w.off('error', onErr); w.off('exit', onExit); };
+      const onMsg = (msg: TileResult): void => { done(); this.release(w); resolve(msg); };
+      const onErr = (err: Error): void => { done(); this.retire(w); reject(err); };
+      const onExit = (code: number): void => { done(); this.retire(w); reject(new Error(`worker exited unexpectedly (code ${code})`)); };
+      w.on('message', onMsg);
+      w.on('error', onErr);
+      w.on('exit', onExit);
+      w.postMessage(job);
+    }));
+  }
+
+  async destroy(): Promise<void> {
+    const workers = [...this.all];
+    this.all.clear();
+    this.idle.length = 0;
+    this.waiters.length = 0;
+    await Promise.all(workers.map(w => w.terminate()));
+  }
 }
 
 async function pool<T, R>(
@@ -454,26 +505,34 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
     }
   };
 
-  await pool(jobs, JOBS, runWorker, (res) => {
-    applyResult(res);
-    collectForce(res);
-    if (res.rendered && rendered % 20 === 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
-  });
-  if (rendered % 20 !== 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
+  // One pool of persistent workers for both worker phases; torn down before the
+  // sharp-heavy overview phase (phase 2) so the render threads don't sit idle
+  // holding memory while the parent composites tiles.
+  const workerPool = new WorkerPool(JOBS);
+  try {
+    await pool(jobs, JOBS, j => workerPool.run(j), (res) => {
+      applyResult(res);
+      collectForce(res);
+      if (res.rendered && rendered % 20 === 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
+    });
+    if (rendered % 20 !== 0) console.log(`rendered: ${rendered} / ${jobs.length}`);
 
-  // Phase 1b: redraw the flagged neighbours so their cross-region shading/blur
-  // stays correct. Forced (since = -1); their own edges are unchanged, so they
-  // don't cascade further.
-  const forcedJobs: Job[] = [];
-  for (const nk of forceKeys) {
-    const r = byKey.get(nk)!;
-    let mtimeMs = 0;
-    try { mtimeMs = statSync(r.file).mtimeMs; } catch { /* treat as changed */ }
-    forcedJobs.push({ file: r.file, rx: r.rx, rz: r.rz, since: -1, mtimeMs });
-  }
-  if (forcedJobs.length) {
-    await pool(forcedJobs, JOBS, runWorker, applyResult);
-    console.log(`edge redraws: ${forcedJobs.length} neighbour tile(s)`);
+    // Phase 1b: redraw the flagged neighbours so their cross-region shading/blur
+    // stays correct. Forced (since = -1); their own edges are unchanged, so they
+    // don't cascade further.
+    const forcedJobs: Job[] = [];
+    for (const nk of forceKeys) {
+      const r = byKey.get(nk)!;
+      let mtimeMs = 0;
+      try { mtimeMs = statSync(r.file).mtimeMs; } catch { /* treat as changed */ }
+      forcedJobs.push({ file: r.file, rx: r.rx, rz: r.rz, since: -1, mtimeMs });
+    }
+    if (forcedJobs.length) {
+      await pool(forcedJobs, JOBS, j => workerPool.run(j), applyResult);
+      console.log(`edge redraws: ${forcedJobs.length} neighbour tile(s)`);
+    }
+  } finally {
+    await workerPool.destroy();
   }
 
   // Regions that disappeared since last run: drop their tile, dirty the parents.
