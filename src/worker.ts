@@ -49,12 +49,23 @@ const biomeColors = loadBiomeColors(process.env.BIOME_COLORS_PATH);
 // render signature hashes — so changing one there forces a redraw automatically.
 const { brightness: BRIGHTNESS, foliage: FOLIAGE, grass: GRASS, grassFoliage: GRASS_FOLIAGE, dryFoliage: DRY_FOLIAGE, water: WATER_BRIGHT, blendR: BLEND_R } = renderConfig();
 
+// Hand a file's bytes to the parser without copying when possible. readFileSync
+// returns a dedicated (unpooled) Buffer for anything larger than half the Buffer
+// pool — which region files always are — so its backing ArrayBuffer is exactly
+// this file and can be used directly. We only fall back to a copy in the unlikely
+// case the Buffer is a view into a shared pool (small/partial reads). The parser
+// only ever reads here, so sharing the store is safe.
+function fileArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.byteOffset === 0 && buf.byteLength === buf.buffer.byteLength
+    ? (buf.buffer as ArrayBuffer)
+    : (buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+}
+
 // Open a neighbouring region file as a parser, or null if absent/unreadable.
 function openRegion(path: string): AnvilParser | null {
   if (!existsSync(path)) return null;
   try {
-    const b = readFileSync(path);
-    return new AnvilParser(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+    return new AnvilParser(fileArrayBuffer(readFileSync(path)));
   } catch { return null; }
 }
 
@@ -201,8 +212,7 @@ async function processJob(job: Job): Promise<TileResult> {
   // empty region (no chunks) instead of crashing the worker.
   let parser: AnvilParser | null = null;
   try {
-    const buf = readFileSync(file);
-    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const ab = fileArrayBuffer(readFileSync(file));
     if (ab.byteLength >= 8192) parser = new AnvilParser(ab);
     else console.warn(`[worker] region ${file} is empty or truncated; skipping`);
   } catch (e) {
