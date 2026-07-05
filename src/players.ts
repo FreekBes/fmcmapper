@@ -161,7 +161,17 @@ export function startPlayerTracker(): (() => void) | null {
     console.warn('[players] RCON_PASSWORD is not set; the server will likely reject authentication');
   }
 
-  const wss = new WebSocketServer({ port: WS_PORT });
+  // This is a broadcast-only server: viewers only ever receive snapshots, they
+  // never send us data. So keep ws lean — no permessage-deflate (its per-socket
+  // zlib contexts are the main ws memory sink), a tiny maxPayload instead of the
+  // 100 MiB default (caps what a single inbound frame can make us buffer), and
+  // skip UTF-8 validation of incoming frames we don't act on anyway.
+  const wss = new WebSocketServer({
+    port: WS_PORT,
+    perMessageDeflate: false,
+    maxPayload: 1024,
+    skipUTF8Validation: true,
+  });
   let last: Snapshot = { type: 'players', t: 0, players: [] };
 
   wss.on('listening', () => console.log(`[players] WebSocket server listening on :${WS_PORT}`));
