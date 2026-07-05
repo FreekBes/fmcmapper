@@ -258,7 +258,7 @@ open `http://localhost:8080`.
 | `OUTPUT_PATH`     | `./output`             | Where the map (tiles + `index.html`) is written.                    |
 | `DIMENSION`       | `minecraft:overworld`  | Which dimension to map (`minecraft:the_nether`, `minecraft:the_end`, or a modded id). |
 | `RENDER_INTERVAL` | *(unset)*              | Minutes between renders. **Unset = render once and exit.** Set it to run as a service. |
-| `TILER_JOBS`      | half your CPU cores    | How many regions to render in parallel.                             |
+| `TILER_JOBS`      | a quarter of your CPU cores | How many regions to render in parallel. Raise it for faster renders at the cost of more RAM. |
 | `TILER_FULL`      | `0`                    | Set to `1` to force a full redraw instead of an incremental one.    |
 | `SERVE_ONLY`      | `0`                    | Set to `1` to **only serve** the existing `OUTPUT_PATH` and never render. Lets you keep serving a finished map after deleting the world to save disk; no world is read and live players are off. |
 | `RCON_HOST`       | *(unset)*              | The host to connect to via RCON to fetch live player locations.     |

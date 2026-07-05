@@ -302,8 +302,8 @@ async function buildParent(root: string, z: number, x: number, y: number): Promi
 
 // --- render one pass --------------------------------------------------------
 async function render(worldPath: string, dimension: string, outDir: string): Promise<void> {
-  // Concurrency: default to half the cores to keep temps/CPU down.
-  const JOBS = Math.max(1, Number(process.env.TILER_JOBS) || Math.floor(cpus().length / 2));
+  // Concurrency: default to a quarter of the cores to keep RAM/temps/CPU down.
+  const JOBS = Math.max(1, Number(process.env.TILER_JOBS) || Math.floor(cpus().length / 4));
   const forceFull = process.env.TILER_FULL === '1' || process.env.TILER_FULL === 'true';
 
   const regions = listRegions(regionDir(worldPath, dimension));
