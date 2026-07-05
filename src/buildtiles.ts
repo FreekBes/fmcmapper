@@ -7,6 +7,11 @@ import { cpus } from 'os';
 import { createHash } from 'crypto';
 import sharp from 'sharp';
 sharp.concurrency(1); // keep libvips from fanning out across all cores
+// Disable libvips' operation/pixel cache. buildParent runs a composite+resize per
+// overview tile across every zoom level, and the default cache holds decoded
+// tiles in native memory that never returns to the OS — the main reason the
+// service process sits at a high RSS long after a render finishes.
+sharp.cache(false);
 import { MapMeta, writeViewer } from './viewer';
 import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
@@ -175,7 +180,10 @@ function runWorker(job: Job): Promise<TileResult> {
       resolve(msg);
       void w.terminate();
     });
-    w.once('error', reject);
+    w.once('error', (err) => {
+      void w.terminate(); // otherwise a failed worker's thread + heap leaks each pass
+      reject(err);
+    });
   });
 }
 
@@ -564,6 +572,10 @@ async function main(): Promise<void> {
     } catch (e) {
       console.error(`render failed (will retry in ${intervalMin}min):`, e instanceof Error ? e.message : e);
     }
+    // A full pass churns through a lot of transient buffers; nudge V8 to hand the
+    // heap high-water mark back to the OS before the long idle sleep. No-op unless
+    // started with --expose-gc (e.g. NODE_OPTIONS=--expose-gc), so it's opt-in.
+    globalThis.gc?.();
     console.log(`render service sleeping for ${intervalMin}min`);
     await sleep(intervalMin * 60000);
   }

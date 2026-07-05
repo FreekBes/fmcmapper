@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import sharp from 'sharp';
 sharp.concurrency(1);
+sharp.cache(false); // don't retain decoded pixels in libvips' native cache
 import { AnvilParser, findChildTag } from 'mc-anvil';
 import {
   topColumns, colorRGB, shadeRGB, loadColorTable, loadBiomeColors, EMPTY_HEIGHT,
@@ -448,10 +449,13 @@ async function render(): Promise<void> {
       rgba[p + 3] = 255;
     }
   }
-  const png = await sharp(Buffer.from(rgba), { raw: { width: SIZE, height: SIZE, channels: 4 } })
+  // Wrap rgba without copying it (Buffer.from(Uint8Array) would clone 1 MiB).
+  const png = await sharp(Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength), { raw: { width: SIZE, height: SIZE, channels: 4 } })
     .png()
     .toBuffer();
-  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(eb, EW, H), dirtyEdges } as TileResult);
+  const result: TileResult = { rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(eb, EW, H), dirtyEdges };
+  // Transfer the PNG's backing store so it's moved into the parent, not cloned.
+  parentPort!.postMessage(result, [png.buffer as ArrayBuffer]);
 }
 
 if (!rendered) {
