@@ -5,6 +5,20 @@ import {
 import { join, dirname, resolve } from 'path';
 import { cpus } from 'os';
 import { createHash } from 'crypto';
+import { setFlagsFromString } from 'v8';
+import { runInNewContext } from 'vm';
+
+// Expose global.gc without needing to launch node with --expose-gc, so the
+// after-pass GC nudge (see the service loop) works out of the box. If the flag
+// was already passed, global.gc is set; otherwise flip it on and grab the
+// function. Best-effort — the caller uses `globalThis.gc?.()`, so a failure here
+// just means the nudge is a no-op.
+if (typeof globalThis.gc !== 'function') {
+  try {
+    setFlagsFromString('--expose-gc');
+    globalThis.gc = runInNewContext('gc') as typeof globalThis.gc;
+  } catch { /* couldn't enable GC; the after-pass nudge becomes a no-op */ }
+}
 import sharp from 'sharp';
 sharp.concurrency(1); // keep libvips from fanning out across all cores
 // Disable libvips' operation/pixel cache. buildParent runs a composite+resize per
@@ -573,8 +587,8 @@ async function main(): Promise<void> {
       console.error(`render failed (will retry in ${intervalMin}min):`, e instanceof Error ? e.message : e);
     }
     // A full pass churns through a lot of transient buffers; nudge V8 to hand the
-    // heap high-water mark back to the OS before the long idle sleep. No-op unless
-    // started with --expose-gc (e.g. NODE_OPTIONS=--expose-gc), so it's opt-in.
+    // heap high-water mark back to the OS before the long idle sleep. gc is enabled
+    // at startup (see the v8/vm shim above), so this normally runs.
     globalThis.gc?.();
     console.log(`render service sleeping for ${intervalMin}min`);
     await sleep(intervalMin * 60000);
