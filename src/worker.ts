@@ -131,15 +131,17 @@ function skip(): void {
   parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: false, png: null, biome: null, dirtyEdges } as TileResult);
 }
 
-// Downsample the per-block surface biome grid to one sample per BIOME_RES block
-// cell, with a compact local palette (index 255 = no biome).
-function biomeCells(biome: (string | null)[]): BiomeCells {
+// Downsample the surface biome grid to one sample per BIOME_RES block cell, with
+// a compact local palette (index 255 = no biome). Reads the region's biomes from
+// the centre of the haloed grid `eb` (offset by H on each axis, stride EW), so we
+// don't keep a second region-sized biome array alongside it.
+function biomeCells(eb: (string | null)[], ew: number, h: number): BiomeCells {
   const palette: string[] = [];
   const idOf = new Map<string, number>();
   const data = new Array<number>(BIOME_CELLS * BIOME_CELLS).fill(255);
   for (let cz = 0; cz < BIOME_CELLS; cz++) {
     for (let cx = 0; cx < BIOME_CELLS; cx++) {
-      const nm = biome[(cz * BIOME_RES) * SIZE + cx * BIOME_RES];
+      const nm = eb[(cz * BIOME_RES + h) * ew + (cx * BIOME_RES + h)];
       if (!nm) continue;
       let id = idOf.get(nm);
       if (id === undefined) { id = palette.length; idOf.set(nm, id); palette.push(nm); }
@@ -185,7 +187,16 @@ function northEdgeHeights(): Int32Array {
 // so colors fade smoothly across biome borders instead of stepping in blocks.
 // ---------------------------------------------------------------------------
 
-type Field = { r: Int16Array; g: Int16Array; b: Int16Array; v: Uint8Array };
+// A blurred tint field: one packed colour per cell, `0xRRGGBB`, or -1 where the
+// blur saw no valid samples. Packing the three channels + validity into a single
+// Int32Array (vs three Int16Arrays + a Uint8 flag) roughly halves the memory held
+// for the four fields across the whole pixel loop.
+type Field = Int32Array;
+
+// Reusable per-axis blur accumulators, allocated once and shared by all four tint
+// kinds (blur runs them sequentially). Row-window channel sums stay well under
+// Int16 (<=255 * (2*rad+1), rad<=8 => <=4335); counts fit Uint8 (<=2*rad+1).
+type Scratch = { hr: Int16Array; hg: Int16Array; hb: Int16Array; hc: Uint8Array };
 
 // The biome-driven tint kinds and how each reads its colour off a BiomeColor.
 // (BiomeColor uses camelCase `dryFoliage`; the tint id is snake_case.)
@@ -206,54 +217,41 @@ const PICK: Record<TintKind, (bc: BiomeColor) => number> = {
 const DEFAULT_TINT: BiomeColor = { grass: 0x91bd59, foliage: 0x48b518, dryFoliage: 0x96a053, water: 0x3f76e4 };
 
 function tintField(grid: (string | null)[], dim: number, pick: (bc: BiomeColor) => number): Field {
-  const N = dim * dim;
-  const r = new Int16Array(N);
-  const g = new Int16Array(N);
-  const b = new Int16Array(N);
-  const v = new Uint8Array(N);
-  for (let i = 0; i < N; i++) {
+  const f = new Int32Array(dim * dim).fill(-1);
+  for (let i = 0; i < f.length; i++) {
     const bn = grid[i];
     if (!bn) continue;
     const bc = biomeColors.get(bn);
     if (!bc) continue;
     const rgb = pick(bc);
     if (rgb < 0) continue;
-    r[i] = (rgb >> 16) & 255;
-    g[i] = (rgb >> 8) & 255;
-    b[i] = rgb & 255;
-    v[i] = 1;
+    f[i] = rgb & 0xffffff; // 0xRRGGBB, always >= 0 so it reads as "valid"
   }
-  return { r, g, b, v };
+  return f;
 }
 
 // Separable box blur over a dim x dim grid that averages only over valid cells
-// (so no-biome holes and grid edges don't darken the result).
-function blur(src: Field, dim: number, rad: number): Field {
-  const N = dim * dim;
-  const hr = new Float32Array(N);
-  const hg = new Float32Array(N);
-  const hb = new Float32Array(N);
-  const hc = new Int32Array(N);
-
+// (so no-biome holes and grid edges don't darken the result). `s` holds the
+// horizontal-pass accumulators, reused across kinds to avoid re-allocating them.
+function blur(src: Field, dim: number, rad: number, s: Scratch): Field {
+  const { hr, hg, hb, hc } = s;
   for (let y = 0; y < dim; y++) {
     const row = y * dim;
     let sr = 0, sg = 0, sb = 0, sc = 0;
     for (let x = 0; x <= rad && x < dim; x++) {
-      if (src.v[row + x]) { sr += src.r[row + x]; sg += src.g[row + x]; sb += src.b[row + x]; sc++; }
+      const p = src[row + x];
+      if (p >= 0) { sr += (p >> 16) & 255; sg += (p >> 8) & 255; sb += p & 255; sc++; }
     }
     for (let x = 0; x < dim; x++) {
       hr[row + x] = sr; hg[row + x] = sg; hb[row + x] = sb; hc[row + x] = sc;
       const out = x - rad;
-      if (out >= 0 && src.v[row + out]) { sr -= src.r[row + out]; sg -= src.g[row + out]; sb -= src.b[row + out]; sc--; }
+      if (out >= 0) { const p = src[row + out]; if (p >= 0) { sr -= (p >> 16) & 255; sg -= (p >> 8) & 255; sb -= p & 255; sc--; } }
       const inn = x + rad + 1;
-      if (inn < dim && src.v[row + inn]) { sr += src.r[row + inn]; sg += src.g[row + inn]; sb += src.b[row + inn]; sc++; }
+      if (inn < dim) { const p = src[row + inn]; if (p >= 0) { sr += (p >> 16) & 255; sg += (p >> 8) & 255; sb += p & 255; sc++; } }
     }
   }
 
-  const r = new Int16Array(N);
-  const g = new Int16Array(N);
-  const b = new Int16Array(N);
-  const v = new Uint8Array(N);
+  const out = new Int32Array(dim * dim).fill(-1);
   for (let x = 0; x < dim; x++) {
     let sr = 0, sg = 0, sb = 0, sc = 0;
     for (let y = 0; y <= rad && y < dim; y++) {
@@ -261,30 +259,28 @@ function blur(src: Field, dim: number, rad: number): Field {
     }
     for (let y = 0; y < dim; y++) {
       const i = y * dim + x;
-      if (sc > 0) { r[i] = Math.round(sr / sc); g[i] = Math.round(sg / sc); b[i] = Math.round(sb / sc); v[i] = 1; }
-      const out = y - rad;
-      if (out >= 0) { const j = out * dim + x; sr -= hr[j]; sg -= hg[j]; sb -= hb[j]; sc -= hc[j]; }
+      if (sc > 0) out[i] = (Math.round(sr / sc) << 16) | (Math.round(sg / sc) << 8) | Math.round(sb / sc);
+      const o = y - rad;
+      if (o >= 0) { const j = o * dim + x; sr -= hr[j]; sg -= hg[j]; sb -= hb[j]; sc -= hc[j]; }
       const inn = y + rad + 1;
       if (inn < dim) { const j = inn * dim + x; sr += hr[j]; sg += hg[j]; sb += hb[j]; sc += hc[j]; }
     }
   }
-  return { r, g, b, v };
+  return out;
 }
 
-// Build the region's biome grid extended by a BLEND_R-wide halo on all sides,
-// filled from the 8 neighbouring regions, so the blur blends biome tints across
-// region borders instead of clipping at them. Halo cells stay null where a
-// neighbour region/chunk is absent (the blur just averages what's there). Each
-// neighbour chunk is decompressed once (cached) via getChunkContainingCoordinate.
+// Fill the BLEND_R-wide halo around the region's biome grid `eb` from the 8
+// neighbouring regions, so the blur blends biome tints across region borders
+// instead of clipping at them. The region's own biomes are written into the
+// centre of `eb` during pass 1; this only fills the surrounding halo. Halo cells
+// stay null where a neighbour region/chunk is absent (the blur just averages
+// what's there). Each neighbour chunk is decompressed once (cached) via
+// getChunkContainingCoordinate.
 const NEIGHBOURS: [number, number][] = [
   [-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1],
 ];
-function extendedBiome(biome: (string | null)[], h: number, ew: number): (string | null)[] {
-  const eb: (string | null)[] = new Array(ew * ew).fill(null);
-  for (let lz = 0; lz < SIZE; lz++)
-    for (let lx = 0; lx < SIZE; lx++)
-      eb[(lz + h) * ew + (lx + h)] = biome[lz * SIZE + lx];
-  if (h === 0) return eb;
+function fillBiomeHalo(eb: (string | null)[], h: number, ew: number): void {
+  if (h === 0) return;
   for (const [dx, dz] of NEIGHBOURS) {
     const parser = openRegion(join(dirname(file), `r.${rx + dx}.${rz + dz}.mca`));
     if (!parser) continue;
@@ -307,13 +303,22 @@ function extendedBiome(biome: (string | null)[], h: number, ew: number): (string
       }
     }
   }
-  return eb;
 }
 
 async function render(): Promise<void> {
-  const name: (string | null)[] = new Array(SIZE * SIZE).fill(null);
-  const biome: (string | null)[] = new Array(SIZE * SIZE).fill(null);
-  const depth = new Int32Array(SIZE * SIZE);
+  // The biome grid is stored directly in the centre of the BLEND_R-haloed grid
+  // `eb` (see fillBiomeHalo), so we don't keep a second region-sized biome array.
+  // Block names are interned into `namePal` and referenced per pixel by a compact
+  // Uint16 index (NO_NAME = empty), which is far cheaper than a 512x512 array of
+  // string pointers. Water depth is 0..WATER_DEPTH_CAP so it fits in a Uint8.
+  const H = BLEND_R;
+  const EW = SIZE + 2 * H;
+  const NO_NAME = 0xffff;
+  const namePal: string[] = [];
+  const nameId = new Map<string, number>();
+  const nameIdx = new Uint16Array(SIZE * SIZE).fill(NO_NAME);
+  const eb: (string | null)[] = new Array(EW * EW).fill(null);
+  const depth = new Uint8Array(SIZE * SIZE);
   const height = new Int32Array(SIZE * SIZE).fill(EMPTY_HEIGHT);
   let any = false;
 
@@ -335,8 +340,10 @@ async function render(): Promise<void> {
         const lz = cols.oz + clz - baseZ;
         if (lx < 0 || lx >= SIZE || lz < 0 || lz >= SIZE) continue;
         const idx = lz * SIZE + lx;
-        name[idx] = nm;
-        biome[idx] = cols.biomes[cc];
+        let id = nameId.get(nm);
+        if (id === undefined) { id = namePal.length; nameId.set(nm, id); namePal.push(nm); }
+        nameIdx[idx] = id;
+        eb[(lz + H) * EW + (lx + H)] = cols.biomes[cc]; // region biomes -> eb centre
         depth[idx] = cols.depths[cc];
         height[idx] = cols.heights[cc];
         any = true;
@@ -353,23 +360,26 @@ async function render(): Promise<void> {
   // Blur over the region extended by a BLEND_R halo of neighbouring biomes, so
   // tints blend across region borders. With BLEND_R = 0 the halo is empty and
   // the blur is a no-op (each cell keeps its own tint).
-  const H = BLEND_R;
-  const EW = SIZE + 2 * H;
-  const eb = extendedBiome(biome, H, EW);
+  fillBiomeHalo(eb, H, EW);
+  // One set of horizontal-pass accumulators, reused across all four blur kinds.
+  const scratch: Scratch = {
+    hr: new Int16Array(EW * EW), hg: new Int16Array(EW * EW),
+    hb: new Int16Array(EW * EW), hc: new Uint8Array(EW * EW),
+  };
   // One blurred tint field per kind, keyed for direct lookup.
   const blends = {
-    grass: blur(tintField(eb, EW, PICK.grass), EW, H),
-    foliage: blur(tintField(eb, EW, PICK.foliage), EW, H),
-    dry_foliage: blur(tintField(eb, EW, PICK.dry_foliage), EW, H),
-    water: blur(tintField(eb, EW, PICK.water), EW, H),
+    grass: blur(tintField(eb, EW, PICK.grass), EW, H, scratch),
+    foliage: blur(tintField(eb, EW, PICK.foliage), EW, H, scratch),
+    dry_foliage: blur(tintField(eb, EW, PICK.dry_foliage), EW, H, scratch),
+    water: blur(tintField(eb, EW, PICK.water), EW, H, scratch),
   } as Record<TintKind, Field>;
 
   // `ei` is the index into the extended grid for region cell (lx, lz). Prefer the
   // blurred value; fall back to the cell's own biome colour where the blur saw no
   // valid samples.
   const tintBase = (kind: TintKind, ei: number): number => {
-    const fld = blends[kind];
-    if (fld.v[ei]) return (fld.r[ei] << 16) | (fld.g[ei] << 8) | fld.b[ei];
+    const packed = blends[kind][ei];
+    if (packed >= 0) return packed; // 0xRRGGBB, or -1 where the blur had no samples
     const bn = eb[ei];
     const bc = bn ? biomeColors.get(bn) : undefined;
     const c = bc ? PICK[kind](bc) : -1;
@@ -385,8 +395,9 @@ async function render(): Promise<void> {
     for (let lx = 0; lx < SIZE; lx++) {
       const idx = lz * SIZE + lx;
       const ei = (lz + H) * EW + (lx + H); // same cell in the haloed blur grid
-      const nm = name[idx];
-      if (nm === null) continue;
+      const id = nameIdx[idx];
+      if (id === NO_NAME) continue;
+      const nm = namePal[id];
 
       const tint = TINTS[nm];
       let shadeIndex = 1;
@@ -440,7 +451,7 @@ async function render(): Promise<void> {
   const png = await sharp(Buffer.from(rgba), { raw: { width: SIZE, height: SIZE, channels: 4 } })
     .png()
     .toBuffer();
-  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(biome), dirtyEdges } as TileResult);
+  parentPort!.postMessage({ rx, rz, lastUpdate, mtimeMs, rendered: true, png, biome: biomeCells(eb, EW, H), dirtyEdges } as TileResult);
 }
 
 if (!rendered) {
