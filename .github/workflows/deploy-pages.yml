@@ -30,6 +30,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: write # to delete a stale Pages artifact left by a failed earlier attempt
 
 # One deployment at a time; let an in-progress run finish.
 concurrency:
@@ -85,6 +86,23 @@ jobs:
         run: WORLD_PATH="$WORLD_DIR" OUTPUT_PATH=site DIMENSION=minecraft:overworld node build/buildtiles.js --once
 
       - uses: actions/configure-pages@v5
+
+      # A run that failed *after* uploading the Pages artifact leaves it attached
+      # to this run id. Re-running then uploads a second "github-pages" artifact,
+      # and deploy-pages aborts with "Multiple artifacts named github-pages ...
+      # Artifact count is 2". Drop any copy from an earlier attempt so exactly one
+      # remains after the upload below.
+      - name: Remove stale Pages artifact from earlier attempts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ids=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name=="github-pages") | .id' 2>/dev/null || true)
+          for id in $ids; do
+            echo "Deleting stale github-pages artifact $id"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id" || true
+          done
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
