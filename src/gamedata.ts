@@ -5,14 +5,23 @@
 // editing one here forces a redraw automatically — no version bump required.
 // ---------------------------------------------------------------------------
 
+// Minecraft version this renderer was written for. The bundled map_colors.json /
+// biome_colors.json and the TINTS table in gamedata.ts were generated against
+// it; if a world reports a different DataVersion the colors may be stale and
+// should be regenerated with the map-color-dump mod for that version.
+export const TARGET_VERSION = '26.3';
+export const TARGET_DATA_VERSION = 5023;
+
 // Always-submerged plants (no `waterlogged` property — they're implicitly in
 // water). The water-depth scan treats these, plus any waterlogged block, as part
 // of the water column — matching vanilla, which measures depth by fluid state.
 // Without it the scan stops at e.g. a kelp stalk and reports deep ocean as
 // shallow (speckled bright pixels).
 export const SUBMERGED_PLANTS = new Set([
-  'minecraft:kelp', 'minecraft:kelp_plant',
-  'minecraft:seagrass', 'minecraft:tall_seagrass',
+  'minecraft:kelp',
+  'minecraft:kelp_plant',
+  'minecraft:seagrass',
+  'minecraft:tall_seagrass',
   'minecraft:bubble_column',
 ]);
 
@@ -49,7 +58,7 @@ export const TINTS: Record<string, Tint> = {
   // Leaves with a fixed (non-biome) color:
   'minecraft:birch_leaves': 0x80a755,
   'minecraft:spruce_leaves': 0x619961,
-  // Other leaves, such as azalea, cherry and pale oak don't get tinted at all
+  // Other leaves, such as azalea, cherry, poplar and pale oak don't get tinted at all
   // and feature the same color regardless of the biome.
 
   // Submerged plants are always tinted as water.

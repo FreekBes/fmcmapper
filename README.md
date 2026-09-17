@@ -34,20 +34,20 @@ No modded server required. Better yet, no need for a server at all - it is even 
 
 The following versions of Minecraft (Java Edition) are supported by fmcmapper:
 
-- 26.2.x (tag `:26.2`)
-
-The following versions of Minecraft (Java Edition) are supported but don't have
-their own container tag (use `:26.2` or `:latest` instead, they're backwards-compatible):
-- 26.1.x
-- 1.21.x
-- 1.20.x
-- 1.19.x
-- 1.18.x
-- 1.17.x
-- 1.16.x
+| Version | Container image tag  |
+|---------|----------------------|
+| 26.3.x  | `:26.3` or `:latest` |
+| 26.2.x  | `:26.2`              |
+| 26.1.x  | `:26.2` ⚠️            |
+| 1.21.x  | `:26.2` ⚠️            |
+| 1.20.x  | `:26.2` ⚠️            |
+| 1.19.x  | `:26.2` ⚠️            |
+| 1.18.x  | `:26.2` ⚠️            |
+| 1.17.x  | `:26.2` ⚠️            |
+| 1.16.x  | `:26.2` ⚠️            |
 
 Generally the newest version of fmcmapper (tag `:latest`) is backwards compatible
-with these older Minecraft versions, so you can use this version for any world.
+with all above listed Minecraft versions, so you can use this version for any world.
 
 The following versions of Minecraft are **not** supported:
 - Java Edition 1.15.x and older
@@ -99,7 +99,7 @@ services:
     environment:
       EULA: "TRUE"
       TYPE: "VANILLA"
-      VERSION: "26.2"             # keep this matching the fmcmapper tag below
+      VERSION: "26.3"             # keep this matching the fmcmapper tag below
       ENABLE_RCON: "true"         # RCON is needed for live player positions
       RCON_PASSWORD: "changeme"   # pick your own
       RCON_PORT: "25575"
@@ -109,7 +109,7 @@ services:
   # The map renderer + web viewer (this project): renders the world and serves
   # the map to your browser on port 8080.
   fmcmapper:
-    image: ghcr.io/freekbes/fmcmapper:26.2  # keep this matching the Minecraft version above
+    image: ghcr.io/freekbes/fmcmapper:26.3  # keep this matching the Minecraft version above
     pull_policy: always
     container_name: fmcmapper
     restart: "unless-stopped"
@@ -128,7 +128,7 @@ services:
         condition: service_healthy
 ```
 
-The Minecraft version is set to `26.2` in **two** places above — keep them the
+The Minecraft version is set to `26.3` in **two** places above — keep them the
 same so the map's colours match your server's blocks.
 
 You can bump both to a newer Minecraft version when one releases, **but
@@ -223,7 +223,7 @@ world folder on disk. The minimal piece is the `fmcmapper` service:
 ```yaml
 services:
   fmcmapper:
-    image: ghcr.io/freekbes/fmcmapper:26.2  # change 26.2 to your Minecraft version
+    image: ghcr.io/freekbes/fmcmapper:26.3  # change 26.3 to your Minecraft version
     pull_policy: always
     ports:
       - "8080:80"                   # the map in your browser
@@ -244,7 +244,7 @@ refreshes as the world changes without serving stale tiles), gzip, and the
 live-player WebSocket reverse-proxied at `/players`. Just publish port 8080 and
 open `http://localhost:8080`.
 
-> ⚠️ **Match the Minecraft version.** The image tag (`:26.2`) is the Minecraft
+> ⚠️ **Match the Minecraft version.** The image tag (`:26.3`) is the Minecraft
 > version its colours were built for. If your world is a *different* version,
 > fmcmapper still renders, but some block/biome colours may be slightly off and
 > it prints a warning on startup. Use the image tag that matches your server,
@@ -302,11 +302,11 @@ The map-color-dump mod might also be compatible with mods, though I never tried 
 Images are published to the GitHub Container Registry and tagged by the
 Minecraft version they target:
 
-- `ghcr.io/freekbes/fmcmapper:26.2` — newest build for Minecraft 26.2 *(use this)*
-- `ghcr.io/freekbes/fmcmapper:26.2-<n>` — a specific immutable build, for rollback
+- `ghcr.io/freekbes/fmcmapper:26.3` — newest build for Minecraft 26.3 *(use this)*
+- `ghcr.io/freekbes/fmcmapper:26.3-<n>` — a specific immutable build, for rollback
 - `ghcr.io/freekbes/fmcmapper:latest` — newest build overall
 
-With `pull_policy: always`, `docker compose up` re-pulls the moving `:26.2` tag,
+With `pull_policy: always`, `docker compose up` re-pulls the moving `:26.3` tag,
 so you always get the latest render code without editing anything.
 
 ---

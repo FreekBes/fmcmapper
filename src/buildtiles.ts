@@ -31,7 +31,7 @@ import { NBTParser, findChildTagAtPath } from 'mc-anvil';
 import type { TagData } from 'mc-anvil';
 import type { TileResult, BiomeCells } from './worker';
 import { buildBiomeGeoJSON, BIOME_NONE, type GeoJSON } from './biomevector';
-import { TINTS, BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS, SUBMERGED_PLANTS } from './gamedata';
+import { TARGET_VERSION, TARGET_DATA_VERSION, TINTS, BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS, SUBMERGED_PLANTS } from './gamedata';
 import { renderConfig } from './renderconfig';
 import { startPlayerTracker } from './players';
 
@@ -44,7 +44,7 @@ const MANIFEST_VERSION = 2; // bumped for the biome super-tile layout
 // captured by the colour-table, render-config, or TINTS hashes below. (Changing
 // a colour table, a MAP_* setting/default, or which blocks tint is detected
 // automatically, so those don't need a bump.)
-const RENDER_VERSION = 6;
+const RENDER_VERSION = 7;
 
 // Colour tables whose contents feed the render signature (resolved like the worker).
 const MAP_COLORS_PATH = process.env.MAP_COLORS_PATH ?? resolve(process.cwd(), 'assets/map_colors.json');
@@ -73,13 +73,6 @@ function renderSignature(): string {
 const BIOME_TOL_CELLS = 2; // "medium" simplification (tolerance in cells, ~8 blocks)
 const BIOME_SUPER = 5; // regions per super-tile side (5x5 = 25 regions/file)
 const BIOMES_DIR = 'biomes'; // super-tile biome GeoJSON, served to the viewer
-
-// Minecraft version this renderer was written for. The bundled map_colors.json /
-// biome_colors.json and the TINTS table in gamedata.ts were generated against
-// it; if a world reports a different DataVersion the colors may be stale and
-// should be regenerated with the map-color-dump mod for that version.
-const TARGET_VERSION = '26.2';
-const TARGET_DATA_VERSION = 4903;
 
 // --- region folder resolution (modern layout + legacy fallback) -------------
 function regionDir(worldPath: string, dimension: string): string {
@@ -588,7 +581,7 @@ async function render(worldPath: string, dimension: string, outDir: string): Pro
   // Refresh the biome index so the viewer knows which region polygons to load.
   writeBiomeIndex(biomesDir);
 
-  console.log(`done ${incr ? 'incremental' : 'full'}) render pass at ${new Date().toISOString()})`);
+  console.log(`done ${incr ? 'incremental' : 'full'} render pass at ${new Date().toISOString()}`);
 }
 
 function sleep(ms: number): Promise<void> {

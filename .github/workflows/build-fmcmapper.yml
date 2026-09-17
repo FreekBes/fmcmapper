@@ -31,13 +31,13 @@ jobs:
       - uses: actions/checkout@v4
 
       # The renderer targets a specific Minecraft version (TARGET_VERSION in
-      # buildtiles.ts); the image is tagged after it. GHCR image names must be
+      # gamedata.ts); the image is tagged after it. GHCR image names must be
       # lowercase, so build the image reference here.
       - name: Resolve version and image
         id: ver
         run: |
-          ver="$(grep -oP "TARGET_VERSION = '\K[^']+" src/buildtiles.ts)"
-          [ -n "$ver" ] || { echo "could not read TARGET_VERSION from src/buildtiles.ts" >&2; exit 1; }
+          ver="$(grep -oP "TARGET_VERSION = '\K[^']+" src/gamedata.ts)"
+          [ -n "$ver" ] || { echo "could not read TARGET_VERSION from src/gamedata.ts" >&2; exit 1; }
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fmcmapper" >> "$GITHUB_OUTPUT"
 

@@ -143,6 +143,24 @@
       "hex": "#3F76E4"
     }
   },
+  "minecraft:dappled_forest": {
+    "grass": {
+      "RGB": 14641191,
+      "hex": "#DF6827"
+    },
+    "foliage": {
+      "RGB": 15109680,
+      "hex": "#E68E30"
+    },
+    "dryFoliage": {
+      "RGB": 9189892,
+      "hex": "#8C3A04"
+    },
+    "water": {
+      "RGB": 3625300,
+      "hex": "#375154"
+    }
+  },
   "minecraft:dark_forest": {
     "grass": {
       "RGB": 5274162,

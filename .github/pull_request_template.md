@@ -36,11 +36,18 @@ bottom for that. See CONTRIBUTING.md for the full guide.
       `loom_version` in `MapColorDumpMod/gradle.properties` (from <https://fabricmc.net/develop>).
 - [ ] The mod builds (`docker compose -f docker-compose.dump.yml build`).
 - [ ] Regenerated and committed `assets/map_colors.json` + `assets/biome_colors.json`.
-- [ ] Updated `TARGET_VERSION` and `TARGET_DATA_VERSION` in `src/buildtiles.ts`.
-- [ ] Updated the `TINTS` table in `src/chunkmap.ts` for any new biome-tinted
+- [ ] Updated `TARGET_VERSION` and `TARGET_DATA_VERSION` in `src/gamedata.ts`.
+- [ ] Updated the ``TINTS` table in `src/gamedata.ts` for any new biome-tinted
       blocks — or N/A.
+- [ ] Updated `BLOCK_ALIASES` and `BIOME_ALIASES` in `src/gamedata.ts` for any
+      renamed blocks/biomes — or N/A.
+- [ ] Updated `SUBMERGED_PLANTS` in `src/gamedata.ts` for any new always-submerged
+      plants — or N/A.
 - [ ] Tested rendering a world of this version: **no** version-mismatch warning,
       and colours (grass/foliage/water/leaves) look right.
+- [ ] Tested if live player tracking works in a multiplayer server of this version.
+- [ ] Added the new version to the `README.md` table of supported versions, and updated the
+      "latest" version if applicable.
 
 ---
 

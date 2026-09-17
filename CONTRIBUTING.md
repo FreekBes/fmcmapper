@@ -51,6 +51,9 @@ a ready-made `gradle.properties` snippet). Copy those into:
 - **`loader_version`**
 - **`fabric_api_version`** (the one ending in `+<mcversion>`, e.g. `0.153.0+26.2`)
 - **`loom_version`**
+- **`mod_version`** (which is just the Minecraft version with `.0` appended).
+
+Also make sure to update the comment at the top of the file.
 
 ### 2. Make the mod compile against the new version
 
@@ -93,11 +96,11 @@ This starts a headless dev server, fetches the colormap textures, and writes
 
 ### 4. Update the renderer's target version
 
-In [`src/buildtiles.ts`](src/buildtiles.ts):
+In [`src/gamedata.ts`](src/gamedata.ts):
 
 ```ts
-const TARGET_VERSION = '26.2';      // -> the new Minecraft version
-const TARGET_DATA_VERSION = 4903;   // -> the new Minecraft version's DataVersion
+const TARGET_VERSION = '26.3';      // -> the new Minecraft version
+const TARGET_DATA_VERSION = 5023;   // -> the new Minecraft version's DataVersion
 ```
 
 `TARGET_DATA_VERSION` is the world format's `DataVersion`. You can read it from

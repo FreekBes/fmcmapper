@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { Chunk, BlockDataParser, chunkCoordinateFromIndex, findChildTagAtPath } from 'mc-anvil';
+import { Chunk, chunkCoordinateFromIndex, findChildTagAtPath } from 'mc-anvil';
 import type { TagData, BlockStates, Palette } from 'mc-anvil';
 import { BLOCK_ALIASES, BIOME_ALIASES, LEGACY_BIOME_IDS, SUBMERGED_PLANTS } from './gamedata';
 
@@ -127,9 +127,30 @@ function sectionData(section: TagData[]): { bs?: BlockStates; pal?: Palette } {
   return {};
 }
 
-const paletteEntryName = (entry: TagData[]): string => {
-  const n = entry.find(x => x.name.toLowerCase() === 'name');
-  const nm = typeof n?.data === 'string' ? n.data : '';
+// A block-states palette entry. A stateful block is a compound (-> TagData[]):
+// {Name, Properties} pre-26.3, {id, properties} since. A default-state block is
+// stored "compact" as just its id string — a whole section of them becomes a
+// plain string list; a single one inside an otherwise-compound section is a
+// compound holding just the (empty-named) id string.
+type PaletteEntry = TagData[] | string;
+
+const paletteEntryName = (entry: PaletteEntry): string => {
+  let nm = '';
+  if (typeof entry === 'string') {
+    nm = entry; // 26.3 string palette: the entry *is* the block name
+  } else {
+    // Compound entry. 26.3 renamed the block-state fields: `Name`->`id`,
+    // `Properties`->`properties`. A stateful block is {id, properties}; a
+    // default-state block kept in a compound section is stored in "compact" form,
+    // which mc-anvil surfaces as a string tag with an *empty* tag name. So look
+    // for id/Name, then fall back to the first string-valued child (the block id;
+    // property values live nested inside the properties compound, not at the
+    // entry's top level, so they can't be picked up here by mistake).
+    const idName = (n: string): boolean => n === 'id' || n === 'name';
+    const named = entry.find(x => idName(x.name.toLowerCase()) && typeof x.data === 'string');
+    const idTag = named ?? entry.find(x => typeof x.data === 'string');
+    if (idTag && typeof idTag.data === 'string') nm = idTag.data;
+  }
   return BLOCK_ALIASES[nm] ?? nm; // normalise legacy ids to their current name
 };
 
@@ -192,22 +213,26 @@ type SectionReader = {
   idxAt: (lx: number, ly: number, lz: number) => number; // palette index, or -1
 };
 
-const entryWaterlogged = (entry: TagData[]): boolean => {
-  const props = entry.find(x => x.name === 'Properties');
-  const list = props && Array.isArray(props.data) ? (props.data as TagData[]) : null;
+const entryWaterlogged = (entry: PaletteEntry): boolean => {
+  // A string palette entry is a default-state block, so it can't be waterlogged.
+  if (typeof entry === 'string') return false;
+  // Block-state properties: `Properties` pre-26.3, `properties` since. (waterlogged
+  // itself is unchanged.)
+  const props = entry.find(x => (x.name === 'Properties' || x.name === 'properties') && Array.isArray(x.data));
+  const list = props ? (props.data as TagData[]) : null;
   return list?.find(x => x.name === 'waterlogged')?.data === 'true';
 };
 
 // Per palette entry: does this block carry water (so a depth scan keeps going)?
 // Water itself, blocks with waterlogged=true (corals, sea pickles, waterlogged
 // stairs/slabs in ruins), and the implicitly-submerged plants above.
-const submergedFlags = (entries: TagData[][], names: string[]): boolean[] =>
+const submergedFlags = (entries: PaletteEntry[], names: string[]): boolean[] =>
   entries.map((e, i) => names[i] === 'minecraft:water' || SUBMERGED_PLANTS.has(names[i]) || entryWaterlogged(e));
 
 function buildReader(section: TagData[], table: ColorTable): SectionReader | null {
   const { bs, pal } = sectionData(section);
   if (!pal) return null;
-  const entries = pal.data.data as TagData[][];
+  const entries = pal.data.data as PaletteEntry[];
   const palNames = entries.map(paletteEntryName);
   const palDrawable = palNames.map(nm => drawable(nm, table));
   const palSubmerged = submergedFlags(entries, palNames);
@@ -410,7 +435,7 @@ function scanColumns(chunk: Chunk, table: ColorTable): Columns | null {
     const { section, y } = ordered[si];
     const { bs, pal } = sectionData(section);
     if (!pal) continue;
-    const entries = pal.data.data as TagData[][];
+    const entries = pal.data.data as PaletteEntry[];
 
     if (entries.length <= 1) {
       const nm = entries.length === 1 ? paletteEntryName(entries[0]) : '';
@@ -431,10 +456,16 @@ function scanColumns(chunk: Chunk, table: ColorTable): Columns | null {
     const sy = y * 16;
     const palNames = entries.map(paletteEntryName);
     const palDrawable = palNames.map(nm => drawable(nm, table));
-    const raw = new BlockDataParser(bs, pal).getRawBlocks();
+    // Decode the packed block indices ourselves rather than via mc-anvil's
+    // BlockDataParser: since 26.3 a default-state section stores its palette as a
+    // list of name strings, and BlockDataParser assumes the older compound palette
+    // (it calls .find on each entry) and throws. packedExtractor only reads the
+    // LongArray, so it's palette-shape-agnostic — same decoder buildReader uses.
+    const bits = Math.max(4, paletteBits(entries.length)); // blocks: min 4 bits
+    const read = packedExtractor(bs.data, bits);
     for (let i = 4095; i >= 0; i--) {
-      const pi = raw[i];
-      if (pi === undefined || !palDrawable[pi]) continue;
+      const pi = read(i);
+      if (pi < 0 || pi >= palNames.length || !palDrawable[pi]) continue;
       const [lx, ly, lz] = chunkCoordinateFromIndex(i);
       const c = lz * 16 + lx;
       if (names[c] !== null) continue;
