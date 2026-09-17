@@ -7,7 +7,7 @@ name: Deploy example map to Pages
 #
 # Setup (once):
 #   1. Upload a small Minecraft world (matching the renderer's target version,
-#      26.2) as a .zip, .tar.gz, or .tar.xz — a GitHub Release asset works well.
+#      26.3) as a .zip, .tar.gz, or .tar.xz — a GitHub Release asset works well.
 #      Tip: .tar.xz of just level.dat + region/ is the smallest. However,
 #      including everything is better in case we ever add more features.
 #      Example: `tar -C ./mcserver -cf - world | xz -9e -T0 > demo-world.tar.xz`
@@ -83,7 +83,7 @@ jobs:
       # Render the downloaded world once into ./site (the Pages artifact).
       # Colour tables are read from assets/ (cwd); index.html + tiles land in ./site.
       - name: Render example map
-        run: WORLD_PATH="$WORLD_DIR" OUTPUT_PATH=site DIMENSION=minecraft:overworld node build/buildtiles.js --once
+        run: WORLD_PATH="$WORLD_DIR" OUTPUT_PATH=site DIMENSION=minecraft:overworld node build/main.js --once
 
       - uses: actions/configure-pages@v5
 

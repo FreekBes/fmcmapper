@@ -13,11 +13,13 @@
   "license": "MIT",
   "author": "Freek Bes",
   "type": "commonjs",
-  "main": "build/buildtiles.js",
+  "main": "build/main.js",
   "scripts": {
-    "start": "node build/buildtiles.js",
+    "start": "node build/main.js",
     "viewer": "node build/viewer.js",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "mc-anvil": "^2.0.15",
@@ -29,6 +31,7 @@
     "@types/node": "^26.0.1",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.1"
   }
 }

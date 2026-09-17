@@ -1,6 +1,6 @@
 // Pixel-affecting render settings, resolved from the MAP_* env vars with their
-// defaults. Shared by the worker (which applies them) and buildtiles (which
-// hashes them into the render signature), so changing a default here is picked
+// defaults. Shared by the worker (which applies them) and tiles/manifest.ts
+// (which hashes them into the render signature), so changing a default here is picked
 // up automatically — a changed signature forces a full redraw. Keep all the
 // MAP_* defaults in this one place.
 

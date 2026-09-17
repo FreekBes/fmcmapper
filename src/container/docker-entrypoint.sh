@@ -25,4 +25,4 @@ mkdir -p /app/output
 # stdout/stderr via the symlinks set up in the image.
 nginx
 
-exec node build/buildtiles.js
+exec node build/main.js

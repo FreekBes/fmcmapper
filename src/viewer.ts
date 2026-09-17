@@ -393,7 +393,7 @@ export function writeViewer(outDir: string, meta?: MapMeta): void {
 // Standalone CLI: regenerate index.html from an existing map's meta.json.
 //   node build/viewer.js [outDir]   (or OUTPUT_PATH=... node build/viewer.js)
 // outDir comes from the positional arg, falling back to env, then a default —
-// matching buildtiles.js so both tools take the same inputs.
+// matching main.js so both tools take the same inputs.
 if (require.main === module) {
   const outDir = process.argv[2] ?? process.env.OUTPUT_PATH ?? './output';
   writeViewer(outDir);

@@ -4,7 +4,7 @@
 //
 // Entirely opt-in: it does nothing unless an RCON host + port are configured
 // (RCON_HOST / RCON_PORT, with RCON_PASSWORD). Runs inside the renderer's
-// service process (started from buildtiles) and can also run standalone:
+// service process (started from main.ts) and can also run standalone:
 //   node build/players.js
 import { WebSocketServer, WebSocket } from 'ws';
 import Rcon from 'ts-rcon';
@@ -30,7 +30,7 @@ type Snapshot = { type: 'players'; t: number; players: Player[] };
 // --- response parsing -------------------------------------------------------
 
 // `list` -> "There are 2 of a max of 20 players online: Alice, Bob"
-function parseList(resp: string): string[] {
+export function parseList(resp: string): string[] {
   const m = /online:?\s*(.*)$/is.exec(resp);
   if (!m) return [];
   return m[1].split(',').map(s => s.trim()).filter(Boolean);
@@ -38,7 +38,7 @@ function parseList(resp: string): string[] {
 
 // `data get entity <name> Pos` -> "<name> has the following entity data:
 // [123.5d, 64.0d, -42.3d]". parseFloat stops at the `d`/`f` NBT suffixes.
-function parsePos(resp: string): [number, number, number] | null {
+export function parsePos(resp: string): [number, number, number] | null {
   const m = /\[([^\]]*)\]/.exec(resp);
   if (!m) return null;
   const n = m[1].split(',').map(s => parseFloat(s.trim()));
@@ -48,7 +48,7 @@ function parsePos(resp: string): [number, number, number] | null {
 
 // `data get entity <name> Dimension` -> '<name> has the following entity data:
 // "minecraft:the_nether"'. The dimension is a quoted resource-location string.
-function parseDimension(resp: string): string | null {
+export function parseDimension(resp: string): string | null {
   const m = /"([^"]+)"/.exec(resp);
   return m ? m[1] : null;
 }

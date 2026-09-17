@@ -357,14 +357,16 @@ pulling the published images — use them while developing:
 
 | Path                       | What it is                                              |
 |----------------------------|---------------------------------------------------------|
-| `src/buildtiles.ts`        | Entry point — region discovery, scheduling, tile pyramid. |
-| `src/worker.ts`            | Renders one region to an image (runs in worker threads). |
-| `src/chunkmap.ts`          | Block/biome → colour logic.                              |
-| `src/gamedata.ts`          | Tinting rules + block/biome id-rename tables.            |
+| `src/main.ts`              | Entry point — arg/env parsing, one-shot vs service loop. |
+| `src/tiles/`               | The render pipeline: `worker.ts` (renders one region to a PNG, in worker threads), `tint.ts` (biome tint fields + blur), `render.ts` (pass orchestrator), `pool.ts` (worker pool), `io.ts` (tile PNGs + overview pyramid), `manifest.ts` (incremental state + render signature), `biomelayer.ts` + `biomevector.ts` (biome super-tiles + polygons), `constants.ts`. |
+| `src/chunk/`               | Reading a chunk: `sections.ts` (block palette + packing), `biomes.ts` (section + legacy biome readers), `columns.ts` (surface-column scan + water depth). |
+| `src/world/`               | World on disk: `regions.ts` (region-folder layout, region list), `level.ts` (spawn + version from `level.dat`). |
+| `src/colors.ts`            | Map + biome colour tables and shading maths (shared).    |
+| `src/gamedata.ts`          | Tinting rules + block/biome id-rename tables + target version (shared). |
+| `src/renderconfig.ts`      | Resolves the `MAP_*` appearance env vars and defaults (shared). |
 | `src/viewer.ts`            | Generates the Leaflet `index.html`.                      |
 | `src/players.ts`           | Live player tracking (RCON poll + WebSocket server).     |
-| `src/biomevector.ts`       | Builds the biome polygons for the hover tooltip layer.   |
-| `src/renderconfig.ts`      | Resolves the `MAP_*` appearance env vars and defaults.   |
+| `test/`                    | Vitest unit + fixture tests (`npm test`); real per-version region/`level.dat` fixtures in `test/fixtures/`. |
 | `src/container/`           | Image runtime: nginx config, entrypoint, loading page.   |
 | `Dockerfile`               | Builds the fmcmapper image (renderer + built-in nginx).  |
 | `assets/`                  | Bundled `map_colors.json` / `biome_colors.json`.         |
