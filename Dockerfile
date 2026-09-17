@@ -1,10 +1,10 @@
-FROM node:24-bullseye AS deps
+FROM node:24-trixie AS deps
 # RUN apt-get update && apt-get install -y
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-FROM node:24-bullseye AS builder
+FROM node:24-trixie AS builder
 WORKDIR /app
 COPY LICENSE ./
 COPY --from=deps /app/node_modules ./node_modules
@@ -15,7 +15,7 @@ COPY assets ./assets
 RUN npm install -g typescript
 RUN tsc
 
-FROM node:24-bullseye AS runner
+FROM node:24-trixie AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
