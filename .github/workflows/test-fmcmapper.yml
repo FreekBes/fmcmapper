@@ -1,0 +1,31 @@
+name: Test build fmcmapper image
+
+# Verifies the tiling service image still builds on PRs that touch it. Same build
+# definition as the release (reusable build-fmcmapper.yml), but push: false — the
+# image is built and thrown away, never published.
+on:
+  pull_request:
+    branches: ['*']
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/build-fmcmapper.yml'
+      - '.github/workflows/test-fmcmapper.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: test-fmcmapper-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/build-fmcmapper.yml
+    with:
+      push: false

@@ -1,0 +1,33 @@
+name: Release fmcmapper image
+
+# Builds and pushes the tiling service image on master. Runs only when files that
+# affect it change — mod-only changes are handled by release-mapcolordump.yml.
+# The build itself lives in the reusable build-fmcmapper.yml; this caller just
+# supplies the master trigger, permissions, and push: true.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/build-fmcmapper.yml'
+      - '.github/workflows/release-fmcmapper.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: build-fmcmapper-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/build-fmcmapper.yml
+    with:
+      push: true

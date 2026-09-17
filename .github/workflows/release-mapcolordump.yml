@@ -1,0 +1,27 @@
+name: Release map-color-dump image
+
+# Builds and pushes the MapColorDumpMod image on master. Only runs when the mod's
+# folder changes. The build itself lives in the reusable build-mapcolordump.yml;
+# this caller just supplies the master trigger, permissions, and push: true.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'MapColorDumpMod/**'
+      - '.github/workflows/build-mapcolordump.yml'
+      - '.github/workflows/release-mapcolordump.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: build-mapcolordump-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/build-mapcolordump.yml
+    with:
+      push: true

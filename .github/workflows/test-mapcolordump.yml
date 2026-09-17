@@ -1,0 +1,26 @@
+name: Test build map-color-dump image
+
+# Verifies the MapColorDumpMod image still builds on PRs that touch the mod. Same
+# build definition as the release (reusable build-mapcolordump.yml), but
+# push: false — the image is built and thrown away, never published.
+on:
+  pull_request:
+    branches: ['*']
+    paths:
+      - 'MapColorDumpMod/**'
+      - '.github/workflows/build-mapcolordump.yml'
+      - '.github/workflows/test-mapcolordump.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: test-mapcolordump-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/build-mapcolordump.yml
+    with:
+      push: false
