@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Dumps two tables to the run directory when the server starts:
@@ -101,7 +102,10 @@ public class MapColorDump implements ModInitializer {
     // -- blocks ---------------------------------------------------------------
 
     private void dumpBlocks() {
-        Map<String, Object> out = new LinkedHashMap<>();
+        // TreeMap keeps the top-level keys sorted alphabetically, so the output
+        // stays stable across Minecraft versions (registry iteration order can
+        // change) and git diffs only show genuinely changed entries.
+        Map<String, Object> out = new TreeMap<>();
 
         for (Block block : BuiltInRegistries.BLOCK) {
             Identifier key = BuiltInRegistries.BLOCK.getKey(block);
@@ -149,7 +153,9 @@ public class MapColorDump implements ModInitializer {
         // resolve headlessly (no client needed).
         boolean haveColormaps = seedColormaps();
 
-        Map<String, Object> out = new LinkedHashMap<>();
+        // TreeMap: sort biome keys alphabetically for stable, version-independent
+        // output (see dumpBlocks).
+        Map<String, Object> out = new TreeMap<>();
 
         // 26.x: registryOrThrow was renamed to lookupOrThrow; on RegistryAccess
         // it still returns the full Registry (iterable, with getKey).
