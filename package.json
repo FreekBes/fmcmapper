@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "mc-anvil": "^2.0.15",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "ts-rcon": "^1.2.1",
     "ws": "^8.21.0"
   },
@@ -32,6 +32,6 @@
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.1",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.5"
   }
 }
